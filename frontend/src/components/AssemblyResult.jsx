@@ -235,6 +235,16 @@ export default function AssemblyResult({ calc, clientName }) {
                     color="text-orange-400"
                     accent="#F97316"
                 />
+                {calc.partsShipping > 0 && (
+                    <Row
+                        testid="asm-row-parts-shipping"
+                        label="Livraison achat (Leboncoin)"
+                        value={calc.partsShipping}
+                        sign="−"
+                        color="text-orange-400"
+                        accent="#F97316"
+                    />
+                )}
                 {calc.urssafArticles > 0 && (
                     <Row
                         testid="asm-row-urssaf-art"

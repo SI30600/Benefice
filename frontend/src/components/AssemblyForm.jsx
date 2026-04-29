@@ -1,6 +1,6 @@
 import {
     User, Calendar as CalendarIcon, Monitor, Laptop,
-    MapPin, Wrench, HardDrive, Phone, Mail, Home, Cpu, MemoryStick, Plug, Box, Keyboard, Package, KeyRound,
+    MapPin, Wrench, HardDrive, Phone, Mail, Home, Cpu, MemoryStick, Plug, Box, Keyboard, Package, KeyRound, Truck,
 } from "lucide-react";
 
 const ICON_MAP = {
@@ -394,6 +394,35 @@ export default function AssemblyForm({
                     </div>
                 </div>
 
+                {/* Livraison achat Leboncoin */}
+                <div className="bg-[#0d0d0d] border border-[#333333] px-4 py-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Truck className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[11px] tracking-[0.15em] uppercase font-mono text-gray-300">
+                                Livraison achat (Leboncoin)
+                            </span>
+                            <span className="text-[10px] text-gray-500 font-mono truncate">
+                                Charge — frais d'envoi des pièces achetées
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <input
+                            data-testid="asm-input-parts-shipping"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={asm.partsShipping}
+                            onChange={update("partsShipping")}
+                            placeholder="10.00"
+                            className="w-24 h-10 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-orange-400 text-base font-mono font-semibold text-right px-2 focus:outline-none"
+                        />
+                        <span className="font-mono text-base font-semibold text-orange-400">€</span>
+                    </div>
+                </div>
+
                 <p className="text-[11px] text-gray-500 font-mono">
                     Pièces facturées (article — URSSAF 13%). Mets le même montant que le coût si tu refactures sans marge, ou 0 si client fournit ses pièces.
                 </p>
@@ -559,6 +588,7 @@ export default function AssemblyForm({
                             amountWithData: "60",
                             amountWithoutData: "40",
                             travelZone: "vauvert",
+                            partsShipping: "10",
                         });
                     }}
                     className="mt-2 inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 hover:text-yellow-500 transition-colors"

@@ -26,6 +26,7 @@ HEADERS = [
     "Date", "Nom client", "Adresse", "Code postal", "Ville",
     "Téléphone", "Email", "Type machine",
     "Composants (détail)", "Coût pièces (€)", "Pièces facturées (€)",
+    "Livraison achat LBC (€)",
     "Licence Windows (€)", "Prestation (libellé)", "Prestation (€)",
     "Déplacement (zone)", "Déplacement (€)",
     "Total facturé (€)", "Taxe LBC (€)", "URSSAF Articles 13% (€)",

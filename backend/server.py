@@ -55,6 +55,7 @@ class DevisPayload(BaseModel):
     componentsDetail: str = ""
     partsCost: float = 0
     partsSale: float = 0
+    partsShipping: float = 0
     licenseFee: float = 0
     serviceFee: float = 0
     serviceLabel: str = ""
@@ -207,6 +208,7 @@ async def save_devis(payload: DevisPayload = Body(...)):
         payload.componentsDetail,
         payload.partsCost,
         payload.partsSale,
+        payload.partsShipping,
         payload.licenseFee,
         payload.serviceLabel,
         payload.serviceFee,

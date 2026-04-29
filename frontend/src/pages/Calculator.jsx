@@ -84,6 +84,7 @@ export default function Calculator() {
         machineType: "fixe",
         componentsFixe: blankComponents(FIXE_COMPONENTS),
         componentsPortable: blankComponents(PORTABLE_COMPONENTS),
+        partsShipping: "10",
         // Articles (13%)
         licenseWindows: true,
         amountLicense: "100",
@@ -106,6 +107,8 @@ export default function Calculator() {
         const partsSale = +compList
             .reduce((sum, c) => sum + (parseFloat(components[c.key]?.sale) || 0), 0)
             .toFixed(2);
+
+        const partsShipping = parseFloat(asm.partsShipping) || 0;
 
         const licenseFee = asm.licenseWindows ? parseFloat(asm.amountLicense) || 0 : 0;
 
@@ -133,12 +136,12 @@ export default function Calculator() {
         const urssaf = +(urssafArticles + urssafPrestations).toFixed(2);
 
         const totalBilled = +(articlesTotal + prestationsTotal).toFixed(2);
-        const totalCosts = +(partsCost + lbcTax + urssaf).toFixed(2);
+        const totalCosts = +(partsCost + lbcTax + partsShipping + urssaf).toFixed(2);
         const netProfit = +(totalBilled - totalCosts).toFixed(2);
         const margin = totalBilled > 0 ? +((netProfit / totalBilled) * 100).toFixed(1) : 0;
 
         return {
-            partsCost, partsSale, lbcTax,
+            partsCost, partsSale, lbcTax, partsShipping,
             licenseFee, serviceFee, serviceLabel, travel,
             travelLabel: travelObj?.label,
             articlesTotal, prestationsTotal,
@@ -268,6 +271,7 @@ export default function Calculator() {
                                         componentsDetail: compDetail,
                                         partsCost: asmCalc.partsCost,
                                         partsSale: asmCalc.partsSale,
+                                        partsShipping: asmCalc.partsShipping,
                                         licenseFee: asmCalc.licenseFee,
                                         serviceFee: asmCalc.serviceFee,
                                         serviceLabel: asmCalc.serviceLabel,
