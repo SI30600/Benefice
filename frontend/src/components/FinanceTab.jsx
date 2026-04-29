@@ -877,7 +877,6 @@ export default function FinanceTab() {
                                 <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prochaine URSSAF</span><span className="text-red-400">−{fmt(parseFloat(urssafNextOverride) || summary?.previous?.total_taxes || 0)} €</span></div>
-                                <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
                                     <span className={`text-lg font-bold ${projected >= 0 ? "text-green-500" : "text-red-500"}`}>
