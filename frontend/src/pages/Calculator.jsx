@@ -207,7 +207,7 @@ export default function Calculator() {
                                 <span className="text-yellow-500">zéro erreur.</span>
                             </h1>
                             <p className="mt-5 text-base text-gray-400 max-w-xl">
-                                Articles 13,5% · Prestations 23,1% — URSSAF calculée automatiquement
+                                Articles & Prestations — URSSAF calculée automatiquement
                                 selon la nature de chaque ligne.
                             </p>
                         </div>
@@ -329,7 +329,7 @@ export default function Calculator() {
                 <div className="max-w-7xl mx-auto px-6 md:px-12 py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-mono text-[11px] tracking-[0.15em] uppercase text-gray-500">
                     <div className="flex items-center gap-2">
                         <Activity className="h-3 w-3" />
-                        <span>URSSAF · Articles 13,5% / Prestations 23,1%</span>
+                        <span>URSSAF · Articles & Prestations</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5">

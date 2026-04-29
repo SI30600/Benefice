@@ -197,12 +197,12 @@ export default function FinanceTab() {
                         <SectionCard className="lg:col-span-2">
                             <SectionTitle icon={Receipt}>Taxes du mois</SectionTitle>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                                <StatBox label="URSSAF Presta 21,2%" value={cur.urssaf_presta} color="text-blue-400" testid="urssaf-presta" />
-                                <StatBox label="URSSAF Matériel 12,3%" value={cur.urssaf_materiel} color="text-orange-400" testid="urssaf-materiel" />
-                                <StatBox label="URSSAF Formation 21,2%" value={cur.urssaf_formation} color="text-purple-400" testid="urssaf-formation" />
-                                <StatBox label="Impôt Presta 1,7%" value={cur.impot_presta} color="text-blue-300" testid="impot-presta" />
-                                <StatBox label="Impôt Vente 1%" value={cur.impot_vente} color="text-orange-300" testid="impot-vente" />
-                                <StatBox label="CFP 0,2%" value={cur.cfp} color="text-yellow-400" testid="cfp" sub="sur tout le CA" />
+                                <StatBox label="URSSAF Presta" value={cur.urssaf_presta} color="text-blue-400" testid="urssaf-presta" />
+                                <StatBox label="URSSAF Matériel" value={cur.urssaf_materiel} color="text-orange-400" testid="urssaf-materiel" />
+                                <StatBox label="URSSAF Formation" value={cur.urssaf_formation} color="text-purple-400" testid="urssaf-formation" />
+                                <StatBox label="Impôt Presta" value={cur.impot_presta} color="text-blue-300" testid="impot-presta" />
+                                <StatBox label="Impôt Vente" value={cur.impot_vente} color="text-orange-300" testid="impot-vente" />
+                                <StatBox label="Formation pro" value={cur.cfp} color="text-yellow-400" testid="cfp" sub="sur tout le CA" />
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-[#333333]">
@@ -307,8 +307,8 @@ export default function FinanceTab() {
                                 onChange={(e) => setEntryForm({ ...entryForm, category: e.target.value })}
                                 className="h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
                             >
-                                <option value="prestation">Prestation (21,2%)</option>
-                                <option value="materiel">Matériel (12,3%)</option>
+                                <option value="prestation">Prestation</option>
+                                <option value="materiel">Matériel</option>
                                 <option value="formation">Formation</option>
                             </select>
                         </div>

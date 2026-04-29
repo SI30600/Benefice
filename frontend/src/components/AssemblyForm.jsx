@@ -424,7 +424,7 @@ export default function AssemblyForm({
                 </div>
 
                 <p className="text-[11px] text-gray-500 font-mono">
-                    Pièces facturées (article — URSSAF 13%). Mets le même montant que le coût si tu refactures sans marge, ou 0 si client fournit ses pièces.
+                    Pièces facturées (article). Mets le même montant que le coût si tu refactures sans marge, ou 0 si client fournit ses pièces.
                 </p>
 
                 <div className="flex items-center gap-3 py-2">
@@ -442,10 +442,10 @@ export default function AssemblyForm({
                     onToggle={() => setAsm((s) => ({ ...s, licenseWindows: !s.licenseWindows }))}
                     icon={KeyRound}
                     title="Licence Windows"
-                    description="Vente de la licence Windows (article — URSSAF 13%)."
+                    description="Vente de la licence Windows (article)."
                     amount={asm.amountLicense}
                     onAmountChange={update("amountLicense")}
-                    badge="ART · 13%"
+                    badge="ARTICLE"
                     badgeColor="border-orange-500/50 text-orange-400"
                 />
 
@@ -505,7 +505,7 @@ export default function AssemblyForm({
                                                     {opt.title}
                                                 </span>
                                                 <span className="text-[9px] font-mono tracking-[0.15em] uppercase px-1.5 py-0.5 border border-blue-500/50 text-blue-400">
-                                                    PREST · 23%
+                                                    PRESTATION
                                                 </span>
                                             </div>
                                         </div>
@@ -562,7 +562,7 @@ export default function AssemblyForm({
                         ))}
                     </div>
                     <p className="text-[11px] text-gray-500 font-mono">
-                        Le déplacement / livraison est compté comme prestation (URSSAF 23%).
+                        Le déplacement / livraison est compté comme prestation.
                     </p>
                 </div>
 

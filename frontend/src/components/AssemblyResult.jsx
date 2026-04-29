@@ -129,7 +129,7 @@ export default function AssemblyResult({ calc, clientName }) {
                     <div className="flex items-center justify-between mb-2">
                         <div className="text-[10px] tracking-[0.3em] uppercase font-mono flex items-center gap-2 text-orange-400">
                             <FileText className="h-3 w-3" />
-                            Articles · 13,5%
+                            Articles
                         </div>
                     </div>
                     <Row
@@ -166,7 +166,7 @@ export default function AssemblyResult({ calc, clientName }) {
                     <div className="flex items-center justify-between mb-2">
                         <div className="text-[10px] tracking-[0.3em] uppercase font-mono flex items-center gap-2 text-blue-400">
                             <FileText className="h-3 w-3" />
-                            Prestations · 23,1%
+                            Prestations
                         </div>
                     </div>
                     {calc.serviceFee > 0 && (
@@ -248,7 +248,7 @@ export default function AssemblyResult({ calc, clientName }) {
                 {calc.urssafArticles > 0 && (
                     <Row
                         testid="asm-row-urssaf-art"
-                        label="URSSAF Articles 13,5%"
+                        label="URSSAF Articles"
                         value={calc.urssafArticles}
                         sign="−"
                         color="text-orange-400"
@@ -258,7 +258,7 @@ export default function AssemblyResult({ calc, clientName }) {
                 {calc.urssafPrestations > 0 && (
                     <Row
                         testid="asm-row-urssaf-prest"
-                        label="URSSAF Prestations 23,1%"
+                        label="URSSAF Prestations"
                         value={calc.urssafPrestations}
                         sign="−"
                         color="text-blue-400"
