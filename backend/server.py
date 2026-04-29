@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Body
+from fastapi import FastAPI, APIRouter, HTTPException, Body, Depends, Header, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -20,6 +20,11 @@ from finance import (
     AccountBalance, compute_summary, CATEGORIES,
     LbcPurchase, LbcPurchaseCreate,
 )
+from portal_auth import (
+    build_portal_auth_url, exchange_code as portal_exchange_code,
+    get_user_email, gen_token, gen_state as portal_gen_state,
+    expires_at_iso, is_session_active,
+)
 
 
 ROOT_DIR = Path(__file__).parent
@@ -32,6 +37,19 @@ db = client[os.environ['DB_NAME']]
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+
+# ---- Portal auth dependency -------------------------------------------------
+
+async def require_auth(authorization: Optional[str] = Header(None)):
+    """Validate Bearer token issued by /auth/portal/callback."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    token = authorization[7:].strip()
+    session = await db.portal_sessions.find_one({"token": token}, {"_id": 0})
+    if not session or not is_session_active(session):
+        raise HTTPException(status_code=401, detail="Session expirée")
+    return session
 
 
 # ---- Models -----------------------------------------------------------------
@@ -73,6 +91,64 @@ class DevisPayload(BaseModel):
     urssafPrestations: float = 0
     netProfit: float = 0
     margin: float = 0
+
+
+# ---- Portal auth flow -------------------------------------------------------
+
+@api_router.get("/auth/portal/login")
+async def portal_login():
+    state = portal_gen_state()
+    await db.portal_states.insert_one({"state": state, "created_at": now_iso()})
+    url = build_portal_auth_url(state)
+    return {"auth_url": url}
+
+
+@api_router.get("/auth/portal/callback")
+async def portal_callback(code: Optional[str] = None, state: Optional[str] = None,
+                          error: Optional[str] = None, error_description: Optional[str] = None):
+    spa_root = os.environ["PORTAL_REDIRECT_URI"].replace("/api/auth/portal/callback", "")
+
+    if error:
+        return RedirectResponse(f"{spa_root}/?portal_error={error}")
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="code/state manquants")
+
+    state_doc = await db.portal_states.find_one_and_delete({"state": state})
+    if not state_doc:
+        raise HTTPException(status_code=400, detail="state invalide")
+
+    try:
+        result = portal_exchange_code(code)
+        email = get_user_email(result["access_token"])
+    except Exception as e:
+        return RedirectResponse(f"{spa_root}/?portal_error={str(e)[:80]}")
+
+    allowed = (os.environ.get("PORTAL_ALLOWED_EMAIL") or "").lower()
+    if not email or (allowed and email != allowed):
+        return RedirectResponse(f"{spa_root}/?portal_error=email_non_autorise")
+
+    token = gen_token()
+    await db.portal_sessions.insert_one({
+        "token": token,
+        "email": email,
+        "created_at": now_iso(),
+        "expires_at": expires_at_iso(),
+    })
+
+    return RedirectResponse(f"{spa_root}/?portal_token={token}&email={email}")
+
+
+@api_router.get("/auth/portal/me")
+async def portal_me(session: dict = Depends(require_auth)):
+    return {"email": session.get("email"), "expires_at": session.get("expires_at")}
+
+
+@api_router.post("/auth/portal/logout")
+async def portal_logout(authorization: Optional[str] = Header(None)):
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:].strip()
+        await db.portal_sessions.delete_one({"token": token})
+    return {"logged_out": True}
 
 
 # ---- Default routes ---------------------------------------------------------
@@ -281,7 +357,7 @@ async def save_devis(payload: DevisPayload = Body(...)):
 # ---- Finance: entries -------------------------------------------------------
 
 @api_router.post("/finance/entries", response_model=FinanceEntry)
-async def create_finance_entry(payload: FinanceEntryCreate):
+async def create_finance_entry(payload: FinanceEntryCreate, _=Depends(require_auth)):
     if payload.category not in CATEGORIES:
         raise HTTPException(status_code=400, detail="Catégorie invalide")
     entry = FinanceEntry(**payload.model_dump())
@@ -290,7 +366,7 @@ async def create_finance_entry(payload: FinanceEntryCreate):
 
 
 @api_router.get("/finance/entries")
-async def list_finance_entries(month: Optional[str] = None):
+async def list_finance_entries(month: Optional[str] = None, _=Depends(require_auth)):
     """List entries; optional `month` filter as YYYY-MM."""
     query: Dict[str, Any] = {}
     if month:
@@ -300,7 +376,7 @@ async def list_finance_entries(month: Optional[str] = None):
 
 
 @api_router.delete("/finance/entries/{entry_id}")
-async def delete_finance_entry(entry_id: str):
+async def delete_finance_entry(entry_id: str, _=Depends(require_auth)):
     res = await db.finance_entries.delete_one({"id": entry_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Entrée introuvable")
@@ -308,7 +384,7 @@ async def delete_finance_entry(entry_id: str):
 
 
 @api_router.get("/finance/summary")
-async def get_finance_summary(month: Optional[str] = None):
+async def get_finance_summary(month: Optional[str] = None, _=Depends(require_auth)):
     """Summary of a month (default current). Returns current + previous month."""
     today = datetime.now(timezone.utc).date()
     if not month:
@@ -336,21 +412,21 @@ async def get_finance_summary(month: Optional[str] = None):
 # ---- Finance: pending payments ----------------------------------------------
 
 @api_router.post("/finance/pending", response_model=PendingPayment)
-async def create_pending_payment(payload: PendingPaymentCreate):
+async def create_pending_payment(payload: PendingPaymentCreate, _=Depends(require_auth)):
     pp = PendingPayment(**payload.model_dump())
     await db.pending_payments.insert_one(pp.model_dump())
     return pp
 
 
 @api_router.get("/finance/pending")
-async def list_pending_payments():
+async def list_pending_payments(_=Depends(require_auth)):
     rows = await db.pending_payments.find({"paid": False}, {"_id": 0}).sort("created_at", -1).to_list(500)
     total = round(sum(r.get("amount", 0) for r in rows), 2)
     return {"items": rows, "total": total, "count": len(rows)}
 
 
 @api_router.delete("/finance/pending/{payment_id}")
-async def delete_pending_payment(payment_id: str):
+async def delete_pending_payment(payment_id: str, _=Depends(require_auth)):
     res = await db.pending_payments.delete_one({"id": payment_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Paiement introuvable")
@@ -363,21 +439,21 @@ BALANCE_DOC_ID = "default"
 
 
 @api_router.post("/finance/lbc-purchases", response_model=LbcPurchase)
-async def create_lbc_purchase(payload: LbcPurchaseCreate):
+async def create_lbc_purchase(payload: LbcPurchaseCreate, _=Depends(require_auth)):
     item = LbcPurchase(**payload.model_dump())
     await db.lbc_purchases.insert_one(item.model_dump())
     return item
 
 
 @api_router.get("/finance/lbc-purchases")
-async def list_lbc_purchases():
+async def list_lbc_purchases(_=Depends(require_auth)):
     rows = await db.lbc_purchases.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     total = round(sum(r.get("amount", 0) for r in rows), 2)
     return {"items": rows, "total": total, "count": len(rows)}
 
 
 @api_router.delete("/finance/lbc-purchases/{purchase_id}")
-async def delete_lbc_purchase(purchase_id: str):
+async def delete_lbc_purchase(purchase_id: str, _=Depends(require_auth)):
     res = await db.lbc_purchases.delete_one({"id": purchase_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Achat introuvable")
@@ -385,7 +461,7 @@ async def delete_lbc_purchase(purchase_id: str):
 
 
 @api_router.get("/finance/balance")
-async def get_balance():
+async def get_balance(_=Depends(require_auth)):
     doc = await db.account_balance.find_one({"_id": BALANCE_DOC_ID}, {"_id": 0})
     if not doc:
         return {"balance": 0, "cb_deferred": 0, "lbc_pending": 0, "updated_at": ""}
@@ -395,7 +471,7 @@ async def get_balance():
 
 
 @api_router.put("/finance/balance")
-async def set_balance(body: AccountBalance):
+async def set_balance(body: AccountBalance, _=Depends(require_auth)):
     update = body.model_dump()
     update["updated_at"] = now_iso()
     await db.account_balance.update_one(
