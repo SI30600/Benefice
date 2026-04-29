@@ -326,41 +326,63 @@ export default function FinanceTab() {
         );
     }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal]);
 
-    // Courbe prévisionnelle jour par jour du mois courant
+    // Courbe prévisionnelle : 30 jours glissants (aujourd'hui → J+30)
     const projectionData = useMemo(() => {
         if (!cur) return [];
+        const HORIZON_DAYS = 30;
         const now = new Date();
-        const year = now.getFullYear();
-        const monthIdx = now.getMonth();
-        const lastDay = new Date(year, monthIdx + 1, 0).getDate();
         const curDay = now.getDate();
 
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
-        // Point de départ = ce que j'ai vraiment sur le compte aujourd'hui
-        // Les paiements attendus & achats LBC sont considérés "immédiats" (date inconnue)
-        // On absorbe les taxes à la fin du mois (déclaration URSSAF tombe déjà via charges récurrentes)
+        // Point de départ = cash réellement dispo aujourd'hui (+ pending à encaisser, − LBC à payer bientôt)
         const startToday = real - cb + pending.total - lbcList.total;
 
-        // Événements datés : charges (-) et revenus récurrents (+)
-        const eventsByDay = {};
+        // Pré-construit les événements pour les 30 prochains jours
+        // (pour chaque date réelle dans l'horizon, somme charges/revenus récurrents tombant ce jour)
+        const eventsByDate = {};
+        for (let i = 0; i <= HORIZON_DAYS; i++) {
+            const d = new Date(now);
+            d.setDate(curDay + i);
+            const key = d.toISOString().slice(0, 10);
+            eventsByDate[key] = 0;
+        }
         (charges.items || []).forEach((c) => {
-            if (c.day_of_month >= curDay && c.day_of_month <= lastDay) {
-                eventsByDay[c.day_of_month] = (eventsByDay[c.day_of_month] || 0) - (c.amount || 0);
+            for (let i = 0; i <= HORIZON_DAYS; i++) {
+                const d = new Date(now);
+                d.setDate(curDay + i);
+                if (d.getDate() === c.day_of_month && i > 0) {
+                    const key = d.toISOString().slice(0, 10);
+                    if (key in eventsByDate) eventsByDate[key] -= (c.amount || 0);
+                }
             }
         });
         (revenues.items || []).forEach((r) => {
-            if (!r.prepaid && r.day_of_month >= curDay && r.day_of_month <= lastDay) {
-                eventsByDay[r.day_of_month] = (eventsByDay[r.day_of_month] || 0) + (r.amount || 0);
+            if (r.prepaid) return;
+            for (let i = 0; i <= HORIZON_DAYS; i++) {
+                const d = new Date(now);
+                d.setDate(curDay + i);
+                if (d.getDate() === r.day_of_month && i > 0) {
+                    const key = d.toISOString().slice(0, 10);
+                    if (key in eventsByDate) eventsByDate[key] += (r.amount || 0);
+                }
             }
         });
 
+        const keys = Object.keys(eventsByDate).sort();
         const points = [];
         let running = startToday;
-        for (let d = curDay; d <= lastDay; d++) {
-            running += eventsByDay[d] || 0;
-            points.push({ day: d, solde: Math.round(running * 100) / 100 });
-        }
+        keys.forEach((key, idx) => {
+            running += eventsByDate[key];
+            const dd = new Date(key);
+            points.push({
+                day: key.slice(5), // "MM-DD" comme label
+                dayNum: dd.getDate(),
+                label: `${String(dd.getDate()).padStart(2, "0")}/${String(dd.getMonth() + 1).padStart(2, "0")}`,
+                solde: Math.round(running * 100) / 100,
+                idx,
+            });
+        });
         return points;
     }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur]);
 
@@ -837,13 +859,13 @@ export default function FinanceTab() {
             {/* Courbe prévisionnelle du mois */}
             <SectionCard>
                 <SectionTitle icon={TrendingUp} accent="text-cyan-400">
-                    Prévisionnel jour par jour · {monthLabel(month)}
+                    Prévisionnel glissant · 30 prochains jours
                 </SectionTitle>
                 <p className="text-[10px] text-gray-500 font-mono mb-4">
-                    Projection du solde dispo de aujourd'hui à la fin du mois — tient compte des prélèvements et abos datés
+                    Projection du solde dispo sur les 30 prochains jours — inclut les prélèvements et abos récurrents datés
                     {cur && cur.total_taxes > 0 && (
                         <span className="ml-2 text-yellow-500">
-                            · ligne jaune = réserve URSSAF du mois prochain ({fmt(cur.total_taxes)} €)
+                            · ligne jaune = réserve URSSAF M+1 ({fmt(cur.total_taxes)} €)
                         </span>
                     )}
                     {projectionMin < 0 && (
@@ -861,10 +883,11 @@ export default function FinanceTab() {
                             <LineChart data={projectionData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
                                 <XAxis
-                                    dataKey="day"
+                                    dataKey="label"
                                     stroke="#666"
-                                    tick={{ fill: "#888", fontSize: 11, fontFamily: "monospace" }}
-                                    tickFormatter={(d) => String(d).padStart(2, "0")}
+                                    tick={{ fill: "#888", fontSize: 10, fontFamily: "monospace" }}
+                                    interval="preserveStartEnd"
+                                    minTickGap={25}
                                 />
                                 <YAxis
                                     stroke="#666"
@@ -879,7 +902,7 @@ export default function FinanceTab() {
                                         fontSize: 12,
                                     }}
                                     labelStyle={{ color: "#eab308" }}
-                                    labelFormatter={(d) => `Jour ${String(d).padStart(2, "0")}`}
+                                    labelFormatter={(lbl) => `Jour ${lbl}`}
                                     formatter={(value) => [`${fmt(value)} €`, "Solde projeté"]}
                                 />
                                 <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "0 €", fill: "#ef4444", fontSize: 10, position: "insideRight" }} />
