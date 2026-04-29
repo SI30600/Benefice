@@ -73,7 +73,7 @@ export default function AssemblyResult({ calc, clientName }) {
             {/* Components breakdown */}
             {calc.componentsBreakdown.length > 0 && (
                 <div className="bg-[#111111] border border-[#222222] p-5 mb-4">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-3">
                         <div className="text-[10px] tracking-[0.3em] uppercase text-gray-500 font-mono flex items-center gap-2">
                             <Package className="h-3 w-3" />
                             Composants
@@ -82,13 +82,18 @@ export default function AssemblyResult({ calc, clientName }) {
                             {calc.componentsBreakdown.length} ligne{calc.componentsBreakdown.length > 1 ? "s" : ""}
                         </span>
                     </div>
+                    <div className="grid grid-cols-12 gap-2 text-[9px] tracking-[0.15em] uppercase font-mono text-gray-600 pb-2 border-b border-[#222222]">
+                        <span className="col-span-6">Composant / Modèle</span>
+                        <span className="col-span-3 text-right">Achat</span>
+                        <span className="col-span-3 text-right text-yellow-500/80">Facturé</span>
+                    </div>
                     {calc.componentsBreakdown.map((c) => (
                         <div
                             key={c.key}
                             data-testid={`result-comp-${c.key}`}
-                            className="flex items-center justify-between gap-2 py-2 border-b border-[#222222]/50 last:border-0"
+                            className="grid grid-cols-12 gap-2 py-2 border-b border-[#222222]/50 last:border-0 items-center"
                         >
-                            <div className="flex flex-col min-w-0 flex-1">
+                            <div className="col-span-6 flex flex-col min-w-0">
                                 <span className="text-[11px] text-gray-400 truncate">{c.label}</span>
                                 {c.name && (
                                     <span className="text-[10px] text-gray-600 font-mono truncate">
@@ -96,17 +101,23 @@ export default function AssemblyResult({ calc, clientName }) {
                                     </span>
                                 )}
                             </div>
-                            <span className="font-mono text-xs text-gray-300 shrink-0">
-                                {fmt(c.cost)} €
+                            <span className="col-span-3 font-mono text-xs text-gray-300 text-right">
+                                {fmt(c.cost)}
+                            </span>
+                            <span className="col-span-3 font-mono text-xs text-yellow-500 text-right">
+                                {fmt(c.sale)}
                             </span>
                         </div>
                     ))}
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#333333]">
-                        <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-gray-400">
-                            Sous-total pièces
+                    <div className="grid grid-cols-12 gap-2 mt-3 pt-3 border-t border-[#333333] items-center">
+                        <span className="col-span-6 font-mono text-[10px] tracking-[0.2em] uppercase text-gray-400">
+                            Sous-totaux
                         </span>
-                        <span className="font-mono text-sm font-bold text-yellow-500">
-                            {fmt(calc.partsCost)} €
+                        <span className="col-span-3 font-mono text-sm font-bold text-white text-right">
+                            {fmt(calc.partsCost)}
+                        </span>
+                        <span className="col-span-3 font-mono text-sm font-bold text-yellow-500 text-right">
+                            {fmt(calc.partsSale)}
                         </span>
                     </div>
                 </div>

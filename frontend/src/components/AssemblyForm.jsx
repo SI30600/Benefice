@@ -1,5 +1,5 @@
 import {
-    User, Calendar as CalendarIcon, Monitor, Laptop, ArrowUpFromLine,
+    User, Calendar as CalendarIcon, Monitor, Laptop,
     MapPin, Wrench, HardDrive, Phone, Mail, Home, Cpu, MemoryStick, Plug, Box, Keyboard, Package, KeyRound,
 } from "lucide-react";
 
@@ -37,18 +37,18 @@ const Toggle = ({ active, onClick, children, testid }) => (
 
 const ComponentRow = ({ label, icon: Icon, value, onChange, testid }) => (
     <div className="grid grid-cols-12 gap-2 items-center">
-        <div className="col-span-5 flex items-center gap-2 min-w-0 px-1">
+        <div className="col-span-3 flex items-center gap-2 min-w-0 px-1">
             {Icon && <Icon className="h-3.5 w-3.5 text-gray-500 shrink-0" />}
             <span className="text-xs text-gray-300 truncate">{label}</span>
         </div>
-        <div className="col-span-4">
+        <div className="col-span-3">
             <InputBox>
                 <input
                     data-testid={`${testid}-name`}
                     type="text"
                     value={value.name}
                     onChange={(e) => onChange({ ...value, name: e.target.value })}
-                    placeholder="Modèle / référence"
+                    placeholder="Modèle"
                     className="w-full h-10 px-3 bg-transparent text-white text-xs focus:outline-none placeholder:text-gray-600"
                 />
             </InputBox>
@@ -65,6 +65,22 @@ const ComponentRow = ({ label, icon: Icon, value, onChange, testid }) => (
                     onChange={(e) => onChange({ ...value, cost: e.target.value })}
                     placeholder="0.00"
                     className="w-full h-10 px-3 pr-7 bg-transparent text-white text-sm font-mono focus:outline-none placeholder:text-gray-700"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs">€</span>
+            </InputBox>
+        </div>
+        <div className="col-span-3">
+            <InputBox>
+                <input
+                    data-testid={`${testid}-sale`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={value.sale}
+                    onChange={(e) => onChange({ ...value, sale: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full h-10 px-3 pr-7 bg-transparent text-yellow-500 text-sm font-mono font-semibold focus:outline-none placeholder:text-gray-700"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs">€</span>
             </InputBox>
@@ -162,7 +178,7 @@ const ServiceCard = ({
 );
 
 export default function AssemblyForm({
-    asm, setAsm, travelOptions, fixeComponents, portableComponents, partsCost,
+    asm, setAsm, travelOptions, fixeComponents, portableComponents, partsCost, partsSale,
 }) {
     const update = (key) => (e) => setAsm((s) => ({ ...s, [key]: e.target.value }));
     const isFixe = asm.machineType === "fixe";
@@ -334,9 +350,10 @@ export default function AssemblyForm({
                 </div>
 
                 <div className="grid grid-cols-12 gap-2 px-1 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-600">
-                    <div className="col-span-5">Composant</div>
-                    <div className="col-span-4">Modèle</div>
+                    <div className="col-span-3">Composant</div>
+                    <div className="col-span-3">Modèle</div>
                     <div className="col-span-3">Coût (achat)</div>
+                    <div className="col-span-3 text-yellow-500/80">Pièces facturées</div>
                 </div>
 
                 <div className="space-y-2">
@@ -345,45 +362,41 @@ export default function AssemblyForm({
                             key={c.key}
                             label={c.label}
                             icon={ICON_MAP[c.icon]}
-                            value={asm[componentsKey][c.key] || { name: "", cost: "" }}
+                            value={asm[componentsKey][c.key] || { name: "", cost: "", sale: "" }}
                             onChange={(val) => updateComponent(c.key, val)}
                             testid={`asm-comp-${c.key}`}
                         />
                     ))}
                 </div>
 
-                <div className="flex items-center justify-between bg-[#0d0d0d] border border-[#333333] px-4 py-3">
-                    <span className="text-[11px] tracking-[0.2em] uppercase font-mono text-gray-400">
-                        Total coût pièces (auto)
-                    </span>
-                    <span
-                        data-testid="asm-parts-cost-total"
-                        className="font-mono text-lg font-bold text-yellow-500"
-                    >
-                        {partsCost.toFixed(2)} €
-                    </span>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center justify-between bg-[#0d0d0d] border border-[#333333] px-4 py-3">
+                        <span className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400">
+                            Total achat
+                        </span>
+                        <span
+                            data-testid="asm-parts-cost-total"
+                            className="font-mono text-lg font-bold text-white"
+                        >
+                            {partsCost.toFixed(2)} €
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between bg-[#0d0d0d] border border-yellow-500/40 px-4 py-3">
+                        <span className="text-[10px] tracking-[0.2em] uppercase font-mono text-yellow-300">
+                            Total facturé
+                        </span>
+                        <span
+                            data-testid="asm-parts-sale-total"
+                            className="font-mono text-lg font-bold text-yellow-500"
+                        >
+                            {partsSale.toFixed(2)} €
+                        </span>
+                    </div>
                 </div>
 
-                <div className="space-y-2">
-                    <FieldLabel icon={ArrowUpFromLine}>Pièces facturées au client</FieldLabel>
-                    <InputBox>
-                        <input
-                            data-testid="asm-input-parts-sale"
-                            type="number"
-                            inputMode="decimal"
-                            step="0.01"
-                            min="0"
-                            value={asm.partsSale}
-                            onChange={update("partsSale")}
-                            placeholder="0.00"
-                            className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
-                    </InputBox>
-                    <p className="text-[11px] text-gray-500 font-mono">
-                        Pièces facturées (article — URSSAF 13%). Mets 0 si client fournit ses pièces.
-                    </p>
-                </div>
+                <p className="text-[11px] text-gray-500 font-mono">
+                    Pièces facturées (article — URSSAF 13%). Mets le même montant que le coût si tu refactures sans marge, ou 0 si client fournit ses pièces.
+                </p>
 
                 <div className="flex items-center gap-3 py-2">
                     <div className="h-px flex-1 bg-[#262626]" />
@@ -528,7 +541,7 @@ export default function AssemblyForm({
                     data-testid="asm-btn-reset"
                     onClick={() => {
                         const blank = (list) =>
-                            Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "" }]));
+                            Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "", sale: "" }]));
                         setAsm({
                             clientName: "",
                             clientAddress: "",
@@ -540,7 +553,6 @@ export default function AssemblyForm({
                             machineType: "fixe",
                             componentsFixe: blank(fixeComponents),
                             componentsPortable: blank(portableComponents),
-                            partsSale: "",
                             licenseWindows: true,
                             amountLicense: "100",
                             serviceVariant: "withData",

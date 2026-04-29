@@ -37,7 +37,7 @@ export const RATE_ARTICLE = 0.13;   // ventes d'articles
 export const RATE_PRESTATION = 0.23; // prestations de service
 
 const blankComponents = (list) =>
-    Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "" }]));
+    Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "", sale: "" }]));
 
 export default function Calculator() {
     const [mode, setMode] = useState("quick");
@@ -84,7 +84,6 @@ export default function Calculator() {
         machineType: "fixe",
         componentsFixe: blankComponents(FIXE_COMPONENTS),
         componentsPortable: blankComponents(PORTABLE_COMPONENTS),
-        partsSale: "",
         // Articles (13%)
         licenseWindows: true,
         amountLicense: "100",
@@ -104,8 +103,10 @@ export default function Calculator() {
         const partsCost = +compList
             .reduce((sum, c) => sum + (parseFloat(components[c.key]?.cost) || 0), 0)
             .toFixed(2);
+        const partsSale = +compList
+            .reduce((sum, c) => sum + (parseFloat(components[c.key]?.sale) || 0), 0)
+            .toFixed(2);
 
-        const partsSale = parseFloat(asm.partsSale) || 0;
         const licenseFee = asm.licenseWindows ? parseFloat(asm.amountLicense) || 0 : 0;
 
         let serviceFee = 0;
@@ -150,8 +151,9 @@ export default function Calculator() {
                     label: c.label,
                     name: components[c.key]?.name || "",
                     cost: parseFloat(components[c.key]?.cost) || 0,
+                    sale: parseFloat(components[c.key]?.sale) || 0,
                 }))
-                .filter((c) => c.cost > 0 || c.name),
+                .filter((c) => c.cost > 0 || c.sale > 0 || c.name),
         };
     }, [asm]);
 
@@ -287,6 +289,7 @@ export default function Calculator() {
                                 fixeComponents={FIXE_COMPONENTS}
                                 portableComponents={PORTABLE_COMPONENTS}
                                 partsCost={asmCalc.partsCost}
+                                partsSale={asmCalc.partsSale}
                             />
                         </div>
                         <div className="lg:col-span-5 lg:sticky lg:top-8">
