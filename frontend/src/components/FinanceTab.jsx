@@ -71,6 +71,10 @@ export default function FinanceTab() {
     const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
     const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
+    // URSSAF à payer le 4 de M+1 : auto-calculée depuis summary.previous, override manuel possible
+    const [urssafNextOverride, setUrssafNextOverride] = useState(() => {
+        try { return localStorage.getItem("urssaf_next_override") || ""; } catch { return ""; }
+    });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -377,8 +381,11 @@ export default function FinanceTab() {
         });
 
         // URSSAF : déclaration mensuelle, prélèvement le 4 de M+2
-        // Le 4 du mois SUIVANT = URSSAF de M-1 (CA du mois précédent, calculé depuis summary.previous)
-        const urssafNext = (summary?.previous?.total_taxes) || 0;
+        // Le 4 du mois SUIVANT = URSSAF de M-1
+        // Priorité : override manuel > calcul auto depuis summary.previous
+        const overrideVal = parseFloat(urssafNextOverride);
+        const autoVal = (summary?.previous?.total_taxes) || 0;
+        const urssafNext = (overrideVal > 0) ? overrideVal : autoVal;
         if (urssafNext > 0) {
             const m1 = new Date(now.getFullYear(), now.getMonth() + 1, 4);
             const diff1 = Math.floor((m1 - now) / (1000 * 60 * 60 * 24));
@@ -412,7 +419,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, summary]);
+    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, summary, urssafNextOverride]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
@@ -685,16 +692,35 @@ export default function FinanceTab() {
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
                                 Prochaine URSSAF (le 4 de M+1)
                             </label>
-                            <div className="flex items-center gap-2 mt-1.5 mb-3 h-11 px-3 bg-[#0a0a0a] border border-[#222222]">
-                                <span
-                                    data-testid="urssaf-next-auto"
-                                    className="flex-1 text-orange-400 text-lg font-mono font-bold"
+                            <div className="flex gap-2 mt-1.5 mb-1">
+                                <input
+                                    data-testid="urssaf-next-input"
+                                    type="number"
+                                    step="0.01"
+                                    value={urssafNextOverride}
+                                    onChange={(e) => setUrssafNextOverride(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            try { localStorage.setItem("urssaf_next_override", urssafNextOverride); } catch {}
+                                        }
+                                    }}
+                                    placeholder={summary?.previous?.total_taxes ? `auto : ${fmt(summary.previous.total_taxes)}` : "Ex: 483"}
+                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-orange-500 text-orange-400 text-lg font-mono font-bold focus:outline-none"
+                                />
+                                <button
+                                    data-testid="urssaf-next-save"
+                                    onClick={() => {
+                                        try { localStorage.setItem("urssaf_next_override", urssafNextOverride); } catch {}
+                                    }}
+                                    className="px-3 bg-orange-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-orange-400"
                                 >
-                                    {fmt(summary?.previous?.total_taxes || 0)} €
-                                </span>
-                                <span className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500">
-                                    auto · {summary?.previous_month ? monthLabel(summary.previous_month) : "—"}
-                                </span>
+                                    OK
+                                </button>
+                            </div>
+                            <div className="text-[9px] text-gray-500 font-mono mb-3">
+                                {urssafNextOverride
+                                    ? `Valeur manuelle · auto-calculée : ${fmt(summary?.previous?.total_taxes || 0)} €`
+                                    : `Laissez vide pour utiliser l'auto-calcul (${fmt(summary?.previous?.total_taxes || 0)} €)`}
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
