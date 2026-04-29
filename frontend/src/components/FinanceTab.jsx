@@ -302,6 +302,22 @@ export default function FinanceTab() {
                                     onChange={(e) => setCbDeferredInput(e.target.value)}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
                                 />
+                                <span className="self-center font-mono text-red-400">€</span>
+                            </div>
+
+                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
+                                Achats LBC en attente
+                            </label>
+                            <div className="flex gap-2 mt-1.5 mb-3">
+                                <input
+                                    data-testid="lbc-pending-input"
+                                    type="number"
+                                    step="0.01"
+                                    value={lbcPendingInput}
+                                    onChange={(e) => setLbcPendingInput(e.target.value)}
+                                    placeholder="Débits CB Leboncoin pas encore enregistrés"
+                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
+                                />
                                 <button
                                     data-testid="balance-save"
                                     onClick={saveBalance}
