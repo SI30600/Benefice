@@ -19,8 +19,8 @@ RATE_IMPOT_PRESTA = 0.017
 RATE_IMPOT_VENTE = 0.01
 RATE_FORMATION = 0.002
 
-CATEGORIES = ("prestation", "materiel", "formation")
-Category = Literal["prestation", "materiel", "formation"]
+CATEGORIES = ("prestation", "materiel", "formation", "achat")
+Category = Literal["prestation", "materiel", "formation", "achat"]
 
 
 class FinanceEntry(BaseModel):
@@ -142,6 +142,23 @@ class StockItemCreate(BaseModel):
     unit_value: float = 0
 
 
+# ---- Wife payments (mémo personnel, 300€/mois dus) --------------------------
+
+class WifePayment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    date: str  # ISO YYYY-MM-DD
+    amount: float
+    note: str = ""
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class WifePaymentCreate(BaseModel):
+    date: str
+    amount: float
+    note: str = ""
+
+
 class AccountBalance(BaseModel):
     balance: float = 0
     cb_deferred: float = 0
@@ -153,6 +170,7 @@ def compute_summary(entries: list[dict]) -> dict:
     presta = round(sum(e["amount"] for e in entries if e["category"] == "prestation"), 2)
     materiel = round(sum(e["amount"] for e in entries if e["category"] == "materiel"), 2)
     formation = round(sum(e["amount"] for e in entries if e["category"] == "formation"), 2)
+    achats = round(sum(e["amount"] for e in entries if e["category"] == "achat"), 2)
     total_ca = round(presta + materiel + formation, 2)
 
     urssaf_presta = round(presta * RATE_URSSAF_PRESTA, 2)
@@ -170,9 +188,11 @@ def compute_summary(entries: list[dict]) -> dict:
     total_impot = round(impot_presta + impot_vente + impot_formation, 2)
     total_taxes = round(total_urssaf + total_impot + cfp, 2)
     net_after_taxes = round(total_ca - total_taxes, 2)
+    # Vrai cash "dans la poche" : CA - taxes - coût des achats (matériel revendu)
+    net_in_pocket = round(net_after_taxes - achats, 2)
 
     last_entry = max(
-        (e["date"] for e in entries),
+        (e["date"] for e in entries if e["category"] != "achat"),
         default=None,
     )
 
@@ -181,6 +201,7 @@ def compute_summary(entries: list[dict]) -> dict:
         "presta": presta,
         "materiel": materiel,
         "formation": formation,
+        "achats": achats,
         "urssaf_presta": urssaf_presta,
         "urssaf_materiel": urssaf_materiel,
         "urssaf_formation": urssaf_formation,
@@ -192,6 +213,7 @@ def compute_summary(entries: list[dict]) -> dict:
         "total_impot": total_impot,
         "total_taxes": total_taxes,
         "net_after_taxes": net_after_taxes,
+        "net_in_pocket": net_in_pocket,
         "last_entry_date": last_entry,
-        "entries_count": len(entries),
+        "entries_count": sum(1 for e in entries if e["category"] != "achat"),
     }

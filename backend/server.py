@@ -19,6 +19,7 @@ from finance import (
     RecurringRevenue, RecurringRevenueCreate,
     PaymentToPrepare, PaymentToPrepareCreate,
     StockItem, StockItemCreate,
+    WifePayment, WifePaymentCreate,
 )
 from portal_auth import (
     build_portal_auth_url, exchange_code as portal_exchange_code,
@@ -389,6 +390,44 @@ async def delete_stock_item(item_id: str, _=Depends(require_auth)):
     res = await db.stock_items.delete_one({"id": item_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Article introuvable")
+    return {"deleted": True}
+
+
+# ---- Finance: wife payments (300€/mois dus) ---------------------------------
+
+WIFE_MONTHLY_TARGET = 300.0
+
+
+@api_router.post("/finance/wife-payments", response_model=WifePayment)
+async def create_wife_payment(payload: WifePaymentCreate, _=Depends(require_auth)):
+    item = WifePayment(**payload.model_dump())
+    await db.wife_payments.insert_one(item.model_dump())
+    return item
+
+
+@api_router.get("/finance/wife-payments")
+async def list_wife_payments(month: Optional[str] = None, _=Depends(require_auth)):
+    if not month:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    rows = await db.wife_payments.find(
+        {"date": {"$regex": f"^{month}"}}, {"_id": 0}
+    ).sort("date", 1).to_list(500)
+    total = round(sum(r.get("amount", 0) for r in rows), 2)
+    remaining = round(max(WIFE_MONTHLY_TARGET - total, 0), 2)
+    return {
+        "items": rows,
+        "month": month,
+        "target": WIFE_MONTHLY_TARGET,
+        "paid": total,
+        "remaining": remaining,
+    }
+
+
+@api_router.delete("/finance/wife-payments/{payment_id}")
+async def delete_wife_payment(payment_id: str, _=Depends(require_auth)):
+    res = await db.wife_payments.delete_one({"id": payment_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Versement introuvable")
     return {"deleted": True}
 
 

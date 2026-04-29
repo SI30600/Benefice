@@ -61,6 +61,7 @@ export default function FinanceTab() {
     const [revenues, setRevenues] = useState({ items: [], total: 0 });
     const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
     const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
+    const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -78,6 +79,7 @@ export default function FinanceTab() {
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
     const [prepareForm, setPrepareForm] = useState({ label: "", amount: "", note: "" });
     const [stockForm, setStockForm] = useState({ label: "", kind: "fixe", quantity: "1", unit_value: "" });
+    const [wifeForm, setWifeForm] = useState({ amount: "", note: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
     const [lbcPendingInput, setLbcPendingInput] = useState("");
@@ -85,7 +87,7 @@ export default function FinanceTab() {
     const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumR, entR, penR, balR, lbcR, chargesR, revR, prepR, stockR] = await Promise.all([
+            const [sumR, entR, penR, balR, lbcR, chargesR, revR, prepR, stockR, wifeR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
@@ -95,6 +97,7 @@ export default function FinanceTab() {
                 axios.get(`${API}/finance/recurring-revenues`),
                 axios.get(`${API}/finance/payments-to-prepare`),
                 axios.get(`${API}/finance/stock`),
+                axios.get(`${API}/finance/wife-payments?month=${month}`),
             ]);
             setSummary(sumR.data);
             setEntries(entR.data);
@@ -105,6 +108,7 @@ export default function FinanceTab() {
             setRevenues(revR.data);
             setToPrepare(prepR.data);
             setStock(stockR.data);
+            setWife(wifeR.data);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
             setLbcPendingInput(String(balR.data.lbc_pending ?? 0));
@@ -239,6 +243,23 @@ export default function FinanceTab() {
         refresh();
     };
 
+    const addWifePayment = async () => {
+        const amt = parseFloat(wifeForm.amount);
+        if (!amt || amt <= 0) return;
+        await axios.post(`${API}/finance/wife-payments`, {
+            date: today,
+            amount: amt,
+            note: wifeForm.note || "",
+        });
+        setWifeForm({ amount: "", note: "" });
+        refresh();
+    };
+
+    const deleteWifePayment = async (id) => {
+        await axios.delete(`${API}/finance/wife-payments/${id}`);
+        refresh();
+    };
+
     const saveBalance = async () => {
         await axios.put(`${API}/finance/balance`, {
             balance: parseFloat(balanceInput) || 0,
@@ -290,6 +311,7 @@ export default function FinanceTab() {
             prestation: { label: "Prestation", color: "border-blue-500/50 text-blue-400" },
             materiel: { label: "Matériel", color: "border-orange-500/50 text-orange-400" },
             formation: { label: "Formation", color: "border-purple-500/50 text-purple-400" },
+            achat: { label: "Dépense", color: "border-red-500/50 text-red-400" },
         };
         const conf = map[value] || { label: value, color: "border-gray-500 text-gray-400" };
         return (
@@ -393,17 +415,22 @@ export default function FinanceTab() {
                                     Dans ta poche ce mois-ci
                                 </div>
                                 <div className="text-[11px] text-gray-500 font-mono mb-2">
-                                    CA − URSSAF − impôts − CFP
+                                    CA − taxes − dépenses (achats & sous-traitance)
                                 </div>
                                 <div className="font-mono text-4xl md:text-5xl font-bold text-green-500 tracking-tight">
-                                    {fmt(cur.net_after_taxes)} <span className="text-2xl text-gray-500">€</span>
+                                    {fmt(cur.net_in_pocket ?? cur.net_after_taxes)} <span className="text-2xl text-gray-500">€</span>
                                 </div>
+                                {(cur.achats || 0) > 0 && (
+                                    <div className="text-[10px] text-gray-500 font-mono mt-2">
+                                        dont − {fmt(cur.achats)} € de dépenses déduites
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
                                 <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
-                                <StatBox label="Net après taxes" value={cur.net_after_taxes} color="text-green-500" testid="net-after-taxes" />
+                                <StatBox label="Dépenses" value={cur.achats || 0} color="text-red-400" testid="total-depenses" sub="coûts directs" />
                             </div>
                             <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-ventes">
@@ -430,8 +457,13 @@ export default function FinanceTab() {
                                             Dans ta poche
                                         </div>
                                         <div className="font-mono text-2xl md:text-3xl font-bold text-green-400/90 tracking-tight">
-                                            {fmt(prev.net_after_taxes)} <span className="text-lg text-gray-500">€</span>
+                                            {fmt(prev.net_in_pocket ?? prev.net_after_taxes)} <span className="text-lg text-gray-500">€</span>
                                         </div>
+                                        {(prev.achats || 0) > 0 && (
+                                            <div className="text-[10px] text-gray-500 font-mono mt-1">
+                                                dont − {fmt(prev.achats)} € de dépenses déduites
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -603,9 +635,10 @@ export default function FinanceTab() {
                                 onChange={(e) => setEntryForm({ ...entryForm, category: e.target.value })}
                                 className="h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
                             >
-                                <option value="prestation">Prestation</option>
-                                <option value="materiel">Matériel</option>
-                                <option value="formation">Formation</option>
+                                <option value="prestation">Prestation (revenu)</option>
+                                <option value="materiel">Matériel (revenu)</option>
+                                <option value="formation">Formation (revenu)</option>
+                                <option value="achat">Dépense (coût / sous-traitance)</option>
                             </select>
                         </div>
 
@@ -1106,6 +1139,88 @@ export default function FinanceTab() {
                     )}
                 </SectionCard>
             </div>
+
+            {/* Mémo — Versements femme */}
+            <SectionCard>
+                <SectionTitle icon={Coins} accent="text-pink-400">
+                    Mémo — Courses femme · {fmt(wife.paid)} / {fmt(wife.target)} €
+                </SectionTitle>
+                <p className="text-[10px] text-gray-500 font-mono mb-3">
+                    Objectif {fmt(wife.target)} €/mois · reset auto chaque mois
+                </p>
+
+                {/* Progress bar */}
+                <div className="h-2 bg-[#0d0d0d] border border-[#222222] mb-1 relative overflow-hidden">
+                    <div
+                        data-testid="wife-progress"
+                        className={`h-full ${wife.paid >= wife.target ? "bg-green-500" : "bg-pink-500"} transition-all`}
+                        style={{ width: `${Math.min(100, (wife.paid / wife.target) * 100)}%` }}
+                    />
+                </div>
+                <div className="flex justify-between text-[10px] font-mono mb-3">
+                    <span className="text-gray-500">Versé : <span className={wife.paid >= wife.target ? "text-green-400" : "text-pink-400"}>{fmt(wife.paid)} €</span></span>
+                    <span className="text-gray-500">Reste dû : <span className={wife.remaining === 0 ? "text-green-400" : "text-red-400"}>{fmt(wife.remaining)} €</span></span>
+                </div>
+
+                <div className="grid grid-cols-12 gap-2 mb-3">
+                    <input
+                        data-testid="wife-amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={wifeForm.amount}
+                        onChange={(e) => setWifeForm({ ...wifeForm, amount: e.target.value })}
+                        placeholder="Montant versé €"
+                        className="col-span-4 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-pink-500 text-pink-300 text-sm font-mono focus:outline-none"
+                    />
+                    <input
+                        data-testid="wife-note"
+                        type="text"
+                        value={wifeForm.note}
+                        onChange={(e) => setWifeForm({ ...wifeForm, note: e.target.value })}
+                        placeholder="Note (optionnel)"
+                        className="col-span-5 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-pink-500 text-white text-sm focus:outline-none"
+                    />
+                    <button
+                        data-testid="wife-add"
+                        onClick={addWifePayment}
+                        className="col-span-3 h-10 bg-pink-600 hover:bg-pink-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                    >
+                        <Plus className="h-3 w-3" />
+                        Versé
+                    </button>
+                </div>
+
+                {wife.items.length === 0 ? (
+                    <p className="text-[11px] text-gray-500 font-mono py-4 text-center border border-[#333333] border-dashed">
+                        Aucun versement ce mois
+                    </p>
+                ) : (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {wife.items.map((w) => (
+                            <div
+                                key={w.id}
+                                data-testid={`wife-item-${w.id}`}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[#0d0d0d] border border-[#222222]"
+                            >
+                                <span className="text-[11px] font-mono text-gray-400 w-20 shrink-0">{w.date}</span>
+                                <span className="flex-1 text-sm text-white truncate">{w.note || "—"}</span>
+                                <span className="font-mono text-sm font-bold text-pink-400 shrink-0">
+                                    {fmt(w.amount)} €
+                                </span>
+                                <button
+                                    data-testid={`wife-delete-${w.id}`}
+                                    onClick={() => deleteWifePayment(w.id)}
+                                    className="text-gray-500 hover:text-red-500 transition-colors"
+                                    aria-label="Supprimer"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </SectionCard>
 
             {/* Entries list */}
             <SectionCard>
