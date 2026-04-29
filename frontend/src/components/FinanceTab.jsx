@@ -304,39 +304,66 @@ export default function FinanceTab() {
     const cur = summary?.current;
     const prev = summary?.previous;
 
-    // Charges/revenus récurrents "à venir ce mois" = day_of_month >= jour courant
+    // Charges/revenus récurrents dans les 30 prochains jours (horizon "disponible prév.")
+    const PREV_HORIZON = 30;
     const todayDay = new Date().getDate();
+
+    // Helpers : nombre d'occurrences d'un day_of_month dans les N prochains jours
+    const countOccurrencesInHorizon = (dayOfMonth, horizon) => {
+        if (!dayOfMonth) return 0;
+        const now = new Date();
+        let count = 0;
+        for (let i = 1; i <= horizon; i++) {
+            const d = new Date(now);
+            d.setDate(now.getDate() + i);
+            if (d.getDate() === dayOfMonth) count += 1;
+        }
+        return count;
+    };
+
+    // Prélèvements futurs (à venir ce mois + M+1 si horizon le couvre)
+    const chargesUpcomingTotal = useMemo(
+        () => (charges.items || []).reduce(
+            (s, c) => s + (c.amount || 0) * countOccurrencesInHorizon(c.day_of_month, PREV_HORIZON),
+            0
+        ),
+        [charges.items]
+    );
+    // Liste "à venir" pour l'affichage (marque passé/à venir dans le mois courant uniquement)
     const chargesUpcoming = useMemo(
-        () => charges.items.filter((c) => (c.day_of_month || 0) >= todayDay),
+        () => (charges.items || []).filter((c) => (c.day_of_month || 0) >= todayDay),
         [charges.items, todayDay]
     );
-    const revenuesUpcoming = useMemo(
-        () => revenues.items.filter((r) => !r.prepaid && (r.day_of_month || 0) >= todayDay),
-        [revenues.items, todayDay]
-    );
-    const chargesUpcomingTotal = useMemo(
-        () => chargesUpcoming.reduce((s, c) => s + (c.amount || 0), 0),
-        [chargesUpcoming]
-    );
+    // Revenus récurrents futurs (hors prépayés)
     const revenuesUpcomingTotal = useMemo(
-        () => revenuesUpcoming.reduce((s, r) => s + (r.amount || 0), 0),
-        [revenuesUpcoming]
+        () => (revenues.items || [])
+            .filter((r) => !r.prepaid)
+            .reduce(
+                (s, r) => s + (r.amount || 0) * countOccurrencesInHorizon(r.day_of_month, PREV_HORIZON),
+                0
+            ),
+        [revenues.items]
+    );
+    const revenuesUpcoming = useMemo(
+        () => (revenues.items || []).filter((r) => !r.prepaid && (r.day_of_month || 0) >= todayDay),
+        [revenues.items, todayDay]
     );
 
     const projected = useMemo(() => {
         if (!cur) return 0;
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
+        const urssafNext = parseFloat(urssafNextOverride) || summary?.previous?.total_taxes || 0;
         return (
             real
             + pending.total
             + revenuesUpcomingTotal
-            - cur.total_taxes
+            - urssafNext
             - cb
             - lbcList.total
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal]);
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, urssafNextOverride, summary]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -789,10 +816,12 @@ export default function FinanceTab() {
                                         {fmt((parseFloat(balanceInput) || 0) - (parseFloat(cbDeferredInput) || 0))} €
                                     </span>
                                 </div>
+                                <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 30 prochains jours</div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Prochaine URSSAF</span><span className="text-red-400">−{fmt(parseFloat(urssafNextOverride) || summary?.previous?.total_taxes || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
