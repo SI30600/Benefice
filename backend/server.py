@@ -18,6 +18,7 @@ from onedrive import (
 from finance import (
     FinanceEntry, FinanceEntryCreate, PendingPayment, PendingPaymentCreate,
     AccountBalance, compute_summary, CATEGORIES,
+    LbcPurchase, LbcPurchaseCreate,
 )
 
 
@@ -359,6 +360,28 @@ async def delete_pending_payment(payment_id: str):
 # ---- Finance: account balance ----------------------------------------------
 
 BALANCE_DOC_ID = "default"
+
+
+@api_router.post("/finance/lbc-purchases", response_model=LbcPurchase)
+async def create_lbc_purchase(payload: LbcPurchaseCreate):
+    item = LbcPurchase(**payload.model_dump())
+    await db.lbc_purchases.insert_one(item.model_dump())
+    return item
+
+
+@api_router.get("/finance/lbc-purchases")
+async def list_lbc_purchases():
+    rows = await db.lbc_purchases.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    total = round(sum(r.get("amount", 0) for r in rows), 2)
+    return {"items": rows, "total": total, "count": len(rows)}
+
+
+@api_router.delete("/finance/lbc-purchases/{purchase_id}")
+async def delete_lbc_purchase(purchase_id: str):
+    res = await db.lbc_purchases.delete_one({"id": purchase_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Achat introuvable")
+    return {"deleted": True}
 
 
 @api_router.get("/finance/balance")

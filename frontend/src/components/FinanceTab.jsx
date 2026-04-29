@@ -56,6 +56,7 @@ export default function FinanceTab() {
     const [summary, setSummary] = useState(null);
     const [entries, setEntries] = useState([]);
     const [pending, setPending] = useState({ items: [], total: 0 });
+    const [lbcList, setLbcList] = useState({ items: [], total: 0 });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -68,6 +69,7 @@ export default function FinanceTab() {
         client_name: "",
     });
     const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "" });
+    const [lbcForm, setLbcForm] = useState({ label: "", amount: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
     const [lbcPendingInput, setLbcPendingInput] = useState("");
@@ -127,6 +129,21 @@ export default function FinanceTab() {
         refresh();
     };
 
+    const addLbcPurchase = async () => {
+        if (!lbcForm.amount || parseFloat(lbcForm.amount) <= 0) return;
+        await axios.post(`${API}/finance/lbc-purchases`, {
+            label: lbcForm.label || "Achat LBC",
+            amount: parseFloat(lbcForm.amount),
+        });
+        setLbcForm({ label: "", amount: "" });
+        refresh();
+    };
+
+    const deleteLbcPurchase = async (id) => {
+        await axios.delete(`${API}/finance/lbc-purchases/${id}`);
+        refresh();
+    };
+
     const saveBalance = async () => {
         await axios.put(`${API}/finance/balance`, {
             balance: parseFloat(balanceInput) || 0,
@@ -143,9 +160,8 @@ export default function FinanceTab() {
         if (!cur) return 0;
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
-        const lbc = parseFloat(lbcPendingInput) || 0;
-        return real + pending.total - cur.total_taxes - cb - lbc;
-    }, [balanceInput, cbDeferredInput, lbcPendingInput, pending.total, cur]);
+        return real + pending.total - cur.total_taxes - cb - lbcList.total;
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur]);
 
     const CategoryPill = ({ value }) => {
         const map = {
@@ -302,22 +318,6 @@ export default function FinanceTab() {
                                     onChange={(e) => setCbDeferredInput(e.target.value)}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
                                 />
-                                <span className="self-center font-mono text-red-400">€</span>
-                            </div>
-
-                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
-                                Achats LBC en attente
-                            </label>
-                            <div className="flex gap-2 mt-1.5 mb-3">
-                                <input
-                                    data-testid="lbc-pending-input"
-                                    type="number"
-                                    step="0.01"
-                                    value={lbcPendingInput}
-                                    onChange={(e) => setLbcPendingInput(e.target.value)}
-                                    placeholder="Débits CB Leboncoin pas encore enregistrés"
-                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
-                                />
                                 <button
                                     data-testid="balance-save"
                                     onClick={saveBalance}
@@ -326,6 +326,65 @@ export default function FinanceTab() {
                                     OK
                                 </button>
                             </div>
+
+                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
+                                Achats LBC en attente · {fmt(lbcList.total)} €
+                            </label>
+                            <div className="grid grid-cols-12 gap-2 mt-1.5 mb-2">
+                                <input
+                                    data-testid="lbc-purchase-label"
+                                    type="text"
+                                    value={lbcForm.label}
+                                    onChange={(e) => setLbcForm({ ...lbcForm, label: e.target.value })}
+                                    placeholder="Description (RTX 3070, RAM…)"
+                                    className="col-span-6 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-xs focus:outline-none"
+                                />
+                                <input
+                                    data-testid="lbc-purchase-amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={lbcForm.amount}
+                                    onChange={(e) => setLbcForm({ ...lbcForm, amount: e.target.value })}
+                                    placeholder="€"
+                                    className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-sm font-mono font-bold focus:outline-none"
+                                />
+                                <button
+                                    data-testid="lbc-purchase-add"
+                                    onClick={addLbcPurchase}
+                                    className="col-span-3 h-10 bg-red-600 hover:bg-red-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Ajouter
+                                </button>
+                            </div>
+
+                            {lbcList.items.length > 0 && (
+                                <div className="space-y-1 max-h-40 overflow-y-auto mb-3">
+                                    {lbcList.items.map((p) => (
+                                        <div
+                                            key={p.id}
+                                            data-testid={`lbc-item-${p.id}`}
+                                            className="flex items-center justify-between gap-2 px-2 py-1.5 bg-[#0d0d0d] border border-[#222222]"
+                                        >
+                                            <span className="text-[11px] text-gray-300 truncate flex-1">
+                                                {p.label}
+                                            </span>
+                                            <span className="font-mono text-xs font-bold text-red-400 shrink-0">
+                                                {fmt(p.amount)} €
+                                            </span>
+                                            <button
+                                                data-testid={`lbc-delete-${p.id}`}
+                                                onClick={() => deleteLbcPurchase(p.id)}
+                                                className="text-gray-500 hover:text-red-500 transition-colors"
+                                                aria-label="Supprimer"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                             {balance.updated_at && (
                                 <p className="text-[10px] text-gray-500 font-mono mb-3">
                                     Dernière maj : {new Date(balance.updated_at).toLocaleString("fr-FR")}
@@ -336,7 +395,7 @@ export default function FinanceTab() {
                                 <div className="flex justify-between"><span className="text-gray-400">Solde réel</span><span className="text-white">{fmt(parseFloat(balanceInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Différé CB</span><span className="text-red-400">−{fmt(parseFloat(cbDeferredInput) || 0)} €</span></div>
-                                <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(parseFloat(lbcPendingInput) || 0)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>

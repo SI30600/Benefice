@@ -59,6 +59,19 @@ class PendingPaymentCreate(BaseModel):
     note: str = ""
 
 
+class LbcPurchase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    label: str
+    amount: float
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class LbcPurchaseCreate(BaseModel):
+    label: str
+    amount: float
+
+
 class AccountBalance(BaseModel):
     balance: float = 0
     cb_deferred: float = 0
