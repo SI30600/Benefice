@@ -552,9 +552,15 @@ export default function FinanceTab() {
 
                             <div className="space-y-2 text-[12px] font-mono pt-3 border-t border-[#333333]">
                                 <div className="flex justify-between"><span className="text-gray-400">Solde réel</span><span className="text-white">{fmt(parseFloat(balanceInput) || 0)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Différé CB</span><span className="text-red-400">−{fmt(parseFloat(cbDeferredInput) || 0)} €</span></div>
+                                <div className="flex justify-between border-y border-[#333333] py-1.5 bg-[#0a0a0a] px-2 -mx-2">
+                                    <span className="text-blue-400 uppercase tracking-wider text-[10px]">État compte actuel</span>
+                                    <span className={`font-bold ${((parseFloat(balanceInput) || 0) - (parseFloat(cbDeferredInput) || 0)) >= 0 ? "text-blue-400" : "text-red-500"}`}>
+                                        {fmt((parseFloat(balanceInput) || 0) - (parseFloat(cbDeferredInput) || 0))} €
+                                    </span>
+                                </div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
-                                <div className="flex justify-between"><span className="text-gray-400">− Différé CB</span><span className="text-red-400">−{fmt(parseFloat(cbDeferredInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
