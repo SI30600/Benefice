@@ -62,6 +62,7 @@ class PendingPaymentCreate(BaseModel):
 class AccountBalance(BaseModel):
     balance: float = 0
     cb_deferred: float = 0
+    lbc_pending: float = 0
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 

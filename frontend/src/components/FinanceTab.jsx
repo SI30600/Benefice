@@ -56,7 +56,7 @@ export default function FinanceTab() {
     const [summary, setSummary] = useState(null);
     const [entries, setEntries] = useState([]);
     const [pending, setPending] = useState({ items: [], total: 0 });
-    const [balance, setBalance] = useState({ balance: 0, updated_at: "" });
+    const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
     // Form states
@@ -69,6 +69,8 @@ export default function FinanceTab() {
     });
     const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "" });
     const [balanceInput, setBalanceInput] = useState("");
+    const [cbDeferredInput, setCbDeferredInput] = useState("");
+    const [lbcPendingInput, setLbcPendingInput] = useState("");
 
     const refresh = useCallback(async () => {
         setLoading(true);
@@ -85,6 +87,7 @@ export default function FinanceTab() {
             setBalance(balR.data);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
+            setLbcPendingInput(String(balR.data.lbc_pending ?? 0));
         } catch (e) {
             console.error(e);
         } finally {
@@ -128,6 +131,7 @@ export default function FinanceTab() {
         await axios.put(`${API}/finance/balance`, {
             balance: parseFloat(balanceInput) || 0,
             cb_deferred: parseFloat(cbDeferredInput) || 0,
+            lbc_pending: parseFloat(lbcPendingInput) || 0,
         });
         refresh();
     };
@@ -139,8 +143,9 @@ export default function FinanceTab() {
         if (!cur) return 0;
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
-        return real + pending.total - cur.total_taxes - cb;
-    }, [balanceInput, cbDeferredInput, pending.total, cur]);
+        const lbc = parseFloat(lbcPendingInput) || 0;
+        return real + pending.total - cur.total_taxes - cb - lbc;
+    }, [balanceInput, cbDeferredInput, lbcPendingInput, pending.total, cur]);
 
     const CategoryPill = ({ value }) => {
         const map = {
@@ -315,6 +320,7 @@ export default function FinanceTab() {
                                 <div className="flex justify-between"><span className="text-gray-400">Solde réel</span><span className="text-white">{fmt(parseFloat(balanceInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Différé CB</span><span className="text-red-400">−{fmt(parseFloat(cbDeferredInput) || 0)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(parseFloat(lbcPendingInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
