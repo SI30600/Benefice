@@ -391,13 +391,13 @@ export default function FinanceTab() {
     const projectionData = useMemo(() => {
         if (!cur) return [];
         const HORIZON_DAYS = 90;
-        const PENDING_SPREAD_DAYS = 10; // paiements attendus étalés sur 10 jours
+        const PENDING_DELAY_DAYS = 12; // paiements attendus : tous crédités à J+12 (prudent)
         const now = new Date();
         const curDay = now.getDate();
 
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
-        // Point de départ = cash réellement sur le compte (hors pending, qui arrivera J+1..+10)
+        // Point de départ = cash réellement sur le compte (hors pending, qui arrivera à J+12)
         const startToday = real - cb - lbcList.total;
 
         // Pré-construit les événements pour les N prochains jours
@@ -409,15 +409,12 @@ export default function FinanceTab() {
             eventsByDate[key] = 0;
         }
 
-        // Paiements attendus : étalés linéairement de J+1 à J+PENDING_SPREAD_DAYS
+        // Paiements attendus : crédités en bloc à J+PENDING_DELAY_DAYS (prudent)
         if (pending.total > 0) {
-            const perDay = pending.total / PENDING_SPREAD_DAYS;
-            for (let i = 1; i <= PENDING_SPREAD_DAYS; i++) {
-                const d = new Date(now);
-                d.setDate(curDay + i);
-                const key = d.toISOString().slice(0, 10);
-                if (key in eventsByDate) eventsByDate[key] += perDay;
-            }
+            const d = new Date(now);
+            d.setDate(curDay + PENDING_DELAY_DAYS);
+            const key = d.toISOString().slice(0, 10);
+            if (key in eventsByDate) eventsByDate[key] += pending.total;
         }
 
         (charges.items || []).forEach((c) => {
