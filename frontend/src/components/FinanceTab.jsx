@@ -78,7 +78,24 @@ export default function FinanceTab() {
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
     const [prepareForm, setPrepareForm] = useState({ label: "", amount: "", note: "" });
-    const [stockForm, setStockForm] = useState({ label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "", specs: "" });
+    const emptySpecs = {
+        screen: "",
+        resolution: "",
+        cpu_brand: "",
+        cpu_model: "",
+        ram: "",
+        storage: "",
+        gpu: "",
+        wifi: "",
+        bluetooth: false,
+        webcam: "",
+        keyboard_backlit: false,
+        warranty: "",
+    };
+    const [stockForm, setStockForm] = useState({
+        label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "",
+        specs: { ...emptySpecs },
+    });
     const [wifeForm, setWifeForm] = useState({ amount: "", note: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
@@ -234,9 +251,9 @@ export default function FinanceTab() {
             quantity: parseInt(stockForm.quantity, 10) || 1,
             unit_value: parseFloat(stockForm.unit_value) || 0,
             serial: stockForm.serial || "",
-            specs: stockForm.specs || "",
+            specs: stockForm.specs || {},
         });
-        setStockForm({ label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "", specs: "" });
+        setStockForm({ label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "", specs: { ...emptySpecs } });
         refresh();
     };
 
@@ -1073,23 +1090,182 @@ export default function FinanceTab() {
                             placeholder="N° série / Case N° (ex: YJ029KR0)"
                             className="col-span-12 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-yellow-300 text-sm font-mono focus:outline-none"
                         />
-                        <textarea
-                            data-testid="stock-specs"
-                            value={stockForm.specs}
-                            onChange={(e) => setStockForm({ ...stockForm, specs: e.target.value })}
-                            placeholder={`Format : Portable / PC Fixe
-Écran : 14" / 15,6" / 16" / 17" FHD-LED
-Résolution : 1920x1080 / 2K / 4K / 5K
-Processeur : Intel Core i5 11ᵉ/12ᵉ/13ᵉ/14ᵉ/15ᵉ gén — ou AMD
-Mémoire vive : 8 / 16 Go — DDR4 / DDR5
-Disque : NVMe Hynix 256/512 Go ou plus
-Carte graphique : intégrée / dédiée
-Wifi gen ? (5/6/6E/7) + Bluetooth
-Webcam : avec fermeture vision ? oui / non
-Clavier rétro-éclairé : oui / non`}
-                            rows={7}
-                            className="col-span-12 px-3 py-2 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-gray-300 text-[11px] font-mono leading-relaxed focus:outline-none resize-y"
-                        />
+
+                        {/* Specs structurées */}
+                        <div className="col-span-12 border border-[#333333] bg-[#0a0a0a] p-3 space-y-2">
+                            <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-purple-400 mb-2">Composants</div>
+
+                            {/* Écran + résolution — portable seulement */}
+                            {stockForm.kind === "portable" && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <select
+                                        value={stockForm.specs.screen}
+                                        onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, screen: e.target.value } })}
+                                        className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                    >
+                                        <option value="">Écran…</option>
+                                        <option value='14"'>14"</option>
+                                        <option value='15,6"'>15,6"</option>
+                                        <option value='16"'>16"</option>
+                                        <option value='17"'>17"</option>
+                                    </select>
+                                    <select
+                                        value={stockForm.specs.resolution}
+                                        onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, resolution: e.target.value } })}
+                                        className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                    >
+                                        <option value="">Résolution…</option>
+                                        <option value="FHD 1920x1080">FHD 1920x1080</option>
+                                        <option value="2K">2K</option>
+                                        <option value="4K">4K</option>
+                                        <option value="5K">5K</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* CPU */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <select
+                                    value={stockForm.specs.cpu_brand}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, cpu_brand: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">Marque CPU…</option>
+                                    <option value="Intel Core i3">Intel Core i3</option>
+                                    <option value="Intel Core i5">Intel Core i5</option>
+                                    <option value="Intel Core i7">Intel Core i7</option>
+                                    <option value="Intel Core i9">Intel Core i9</option>
+                                    <option value="AMD Ryzen 5">AMD Ryzen 5</option>
+                                    <option value="AMD Ryzen 7">AMD Ryzen 7</option>
+                                    <option value="AMD Ryzen 9">AMD Ryzen 9</option>
+                                </select>
+                                <select
+                                    value={stockForm.specs.cpu_model}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, cpu_model: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">Génération…</option>
+                                    <option value="11ème gén">11ème gén</option>
+                                    <option value="12ème gén">12ème gén</option>
+                                    <option value="13ème gén">13ème gén</option>
+                                    <option value="14ème gén">14ème gén</option>
+                                    <option value="15ème gén">15ème gén</option>
+                                </select>
+                            </div>
+
+                            {/* RAM + Storage */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <select
+                                    value={stockForm.specs.ram}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, ram: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">RAM…</option>
+                                    <option value="8 Go DDR4">8 Go DDR4</option>
+                                    <option value="16 Go DDR4">16 Go DDR4</option>
+                                    <option value="32 Go DDR4">32 Go DDR4</option>
+                                    <option value="8 Go DDR5">8 Go DDR5</option>
+                                    <option value="16 Go DDR5">16 Go DDR5</option>
+                                    <option value="32 Go DDR5">32 Go DDR5</option>
+                                    <option value="64 Go DDR5">64 Go DDR5</option>
+                                </select>
+                                <select
+                                    value={stockForm.specs.storage}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, storage: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">Stockage…</option>
+                                    <option value="NVMe 256 Go">NVMe 256 Go</option>
+                                    <option value="NVMe Hynix 512 Go">NVMe Hynix 512 Go</option>
+                                    <option value="NVMe 1 To">NVMe 1 To</option>
+                                    <option value="NVMe 2 To">NVMe 2 To</option>
+                                    <option value="SSD 512 Go">SSD 512 Go</option>
+                                    <option value="HDD 1 To">HDD 1 To</option>
+                                </select>
+                            </div>
+
+                            {/* GPU + Wifi */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <select
+                                    value={stockForm.specs.gpu}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, gpu: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">GPU…</option>
+                                    <option value="Intégré Intel">Intégré Intel</option>
+                                    <option value="Intégré AMD">Intégré AMD</option>
+                                    <option value="Nvidia RTX 3050">Nvidia RTX 3050</option>
+                                    <option value="Nvidia RTX 4050">Nvidia RTX 4050</option>
+                                    <option value="Nvidia RTX 4060">Nvidia RTX 4060</option>
+                                    <option value="Nvidia RTX 4070">Nvidia RTX 4070</option>
+                                </select>
+                                <select
+                                    value={stockForm.specs.wifi}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, wifi: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">Wifi…</option>
+                                    <option value="Wifi 5">Wifi 5</option>
+                                    <option value="Wifi 6">Wifi 6</option>
+                                    <option value="Wifi 6E">Wifi 6E</option>
+                                    <option value="Wifi 7">Wifi 7</option>
+                                    <option value="Aucun">Aucun</option>
+                                </select>
+                            </div>
+
+                            {/* Webcam + Garantie (portable only for webcam) */}
+                            <div className="grid grid-cols-2 gap-2">
+                                {stockForm.kind === "portable" ? (
+                                    <select
+                                        value={stockForm.specs.webcam}
+                                        onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, webcam: e.target.value } })}
+                                        className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                    >
+                                        <option value="">Webcam…</option>
+                                        <option value="Avec fermeture">Avec fermeture</option>
+                                        <option value="Sans fermeture">Sans fermeture</option>
+                                        <option value="Aucune">Aucune</option>
+                                    </select>
+                                ) : <span />}
+                                <select
+                                    value={stockForm.specs.warranty}
+                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, warranty: e.target.value } })}
+                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                                >
+                                    <option value="">Garantie constructeur…</option>
+                                    <option value="1 an">1 an</option>
+                                    <option value="2 ans">2 ans</option>
+                                    <option value="3 ans">3 ans</option>
+                                </select>
+                            </div>
+
+                            {/* Checkboxes */}
+                            <div className="flex flex-wrap gap-4 pt-1">
+                                {stockForm.specs.wifi && stockForm.specs.wifi !== "Aucun" && (
+                                    <label className="flex items-center gap-2 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-400 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!stockForm.specs.bluetooth}
+                                            onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, bluetooth: e.target.checked } })}
+                                            className="h-3.5 w-3.5 accent-purple-500"
+                                        />
+                                        Bluetooth
+                                    </label>
+                                )}
+                                {stockForm.kind === "portable" && (
+                                    <label className="flex items-center gap-2 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-400 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!stockForm.specs.keyboard_backlit}
+                                            onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, keyboard_backlit: e.target.checked } })}
+                                            className="h-3.5 w-3.5 accent-purple-500"
+                                        />
+                                        Clavier rétro-éclairé
+                                    </label>
+                                )}
+                            </div>
+                        </div>
+
                         <input
                             data-testid="stock-qty"
                             type="number"
@@ -1167,7 +1343,22 @@ Clavier rétro-éclairé : oui / non`}
                                             S/N : {s.serial}
                                         </div>
                                     )}
-                                    {s.specs && (
+                                    {s.specs && typeof s.specs === "object" && Object.values(s.specs).some((v) => v !== "" && v !== false) && (
+                                        <div className="text-[10px] text-gray-400 font-mono mt-1 ml-16 grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                            {s.specs.screen && <div><span className="text-gray-600">Écran :</span> {s.specs.screen}</div>}
+                                            {s.specs.resolution && <div><span className="text-gray-600">Résolution :</span> {s.specs.resolution}</div>}
+                                            {(s.specs.cpu_brand || s.specs.cpu_model) && <div className="col-span-2"><span className="text-gray-600">CPU :</span> {[s.specs.cpu_brand, s.specs.cpu_model].filter(Boolean).join(" · ")}</div>}
+                                            {s.specs.ram && <div><span className="text-gray-600">RAM :</span> {s.specs.ram}</div>}
+                                            {s.specs.storage && <div><span className="text-gray-600">Disque :</span> {s.specs.storage}</div>}
+                                            {s.specs.gpu && <div><span className="text-gray-600">GPU :</span> {s.specs.gpu}</div>}
+                                            {s.specs.wifi && <div><span className="text-gray-600">Wifi :</span> {s.specs.wifi}{s.specs.bluetooth ? " + BT" : ""}</div>}
+                                            {s.specs.webcam && <div><span className="text-gray-600">Webcam :</span> {s.specs.webcam}</div>}
+                                            {s.specs.keyboard_backlit && <div><span className="text-gray-600">Clavier :</span> rétro-éclairé</div>}
+                                            {s.specs.warranty && <div className="col-span-2"><span className="text-gray-600">Garantie :</span> <span className="text-green-400">{s.specs.warranty}</span></div>}
+                                        </div>
+                                    )}
+                                    {/* fallback : ancien format texte libre */}
+                                    {s.specs && typeof s.specs === "string" && s.specs && (
                                         <pre className="text-[10px] text-gray-400 font-mono mt-1 ml-16 whitespace-pre-wrap leading-relaxed">
                                             {s.specs}
                                         </pre>

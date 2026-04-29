@@ -133,7 +133,7 @@ class StockItem(BaseModel):
     quantity: int = 1
     unit_value: float = 0
     serial: str = ""    # N° de série / case N°
-    specs: str = ""     # description libre (composants)
+    specs: dict = Field(default_factory=dict)   # composants structurés
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -143,7 +143,7 @@ class StockItemCreate(BaseModel):
     quantity: int = 1
     unit_value: float = 0
     serial: str = ""
-    specs: str = ""
+    specs: dict = Field(default_factory=dict)
 
 
 # ---- Wife payments (mémo personnel, 300€/mois dus) --------------------------
