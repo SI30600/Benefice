@@ -258,29 +258,33 @@ export default function FinanceTab() {
                         {/* Récapitulatif compact */}
                         <SectionCard className="lg:col-span-2">
                             <SectionTitle icon={Receipt}>Récapitulatif</SectionTitle>
+                            <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-yellow-500 mb-2">
+                                {monthLabel(month)} (en cours)
+                            </div>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
                                 <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
                                 <StatBox label="Net après taxes" value={cur.net_after_taxes} color="text-green-500" testid="net-after-taxes" />
                             </div>
 
-                            {prev && (prev.total_ca > 0) && (
+                            {prev && (
                                 <div className="mt-4 pt-4 border-t border-[#333333]">
-                                    <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 mb-2">
-                                        Comparaison · {monthLabel(summary.previous_month)}
+                                    <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-400 mb-2">
+                                        {monthLabel(summary.previous_month)} (mois précédent)
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        <StatBox label="CA Total" value={prev.total_ca} color="text-yellow-300/80" testid="prev-ca-total" />
+                                        <StatBox label="Total taxes" value={prev.total_taxes} color="text-red-300/80" testid="prev-total-taxes" />
+                                        <StatBox label="Net après taxes" value={prev.net_after_taxes} color="text-green-400/80" testid="prev-net-after-taxes" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
                                         <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">CA précédent</div>
-                                            <div className="text-gray-200 mt-0.5">{fmt(prev.total_ca)} €</div>
+                                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC ventes préc.</div>
+                                            <div className="font-mono text-base font-semibold text-orange-300/80 mt-0.5">{fmt(prev.materiel)} €</div>
                                         </div>
                                         <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">BIC ventes préc.</div>
-                                            <div className="text-orange-300 mt-0.5">{fmt(prev.materiel)} €</div>
-                                        </div>
-                                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">BIC presta préc.</div>
-                                            <div className="text-blue-300 mt-0.5">{fmt(prev.presta + prev.formation)} €</div>
+                                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC presta préc.</div>
+                                            <div className="font-mono text-base font-semibold text-blue-300/80 mt-0.5">{fmt(prev.presta + prev.formation)} €</div>
                                         </div>
                                     </div>
                                 </div>
