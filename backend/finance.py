@@ -132,6 +132,8 @@ class StockItem(BaseModel):
     kind: str = "fixe"  # "fixe" ou "portable"
     quantity: int = 1
     unit_value: float = 0
+    serial: str = ""    # N° de série / case N°
+    specs: str = ""     # description libre (composants)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -140,6 +142,8 @@ class StockItemCreate(BaseModel):
     kind: str = "fixe"
     quantity: int = 1
     unit_value: float = 0
+    serial: str = ""
+    specs: str = ""
 
 
 # ---- Wife payments (mémo personnel, 300€/mois dus) --------------------------

@@ -78,7 +78,7 @@ export default function FinanceTab() {
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
     const [prepareForm, setPrepareForm] = useState({ label: "", amount: "", note: "" });
-    const [stockForm, setStockForm] = useState({ label: "", kind: "fixe", quantity: "1", unit_value: "" });
+    const [stockForm, setStockForm] = useState({ label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "", specs: "" });
     const [wifeForm, setWifeForm] = useState({ amount: "", note: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
@@ -233,8 +233,10 @@ export default function FinanceTab() {
             kind: stockForm.kind,
             quantity: parseInt(stockForm.quantity, 10) || 1,
             unit_value: parseFloat(stockForm.unit_value) || 0,
+            serial: stockForm.serial || "",
+            specs: stockForm.specs || "",
         });
-        setStockForm({ label: "", kind: "fixe", quantity: "1", unit_value: "" });
+        setStockForm({ label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "", specs: "" });
         refresh();
     };
 
@@ -1051,7 +1053,7 @@ export default function FinanceTab() {
                             type="text"
                             value={stockForm.label}
                             onChange={(e) => setStockForm({ ...stockForm, label: e.target.value })}
-                            placeholder="Modèle (ex: Dell Latitude 5500)"
+                            placeholder="Modèle (ex: Lenovo ThinkCentre Neo 50q Gen5)"
                             className="col-span-7 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-white text-sm focus:outline-none"
                         />
                         <select
@@ -1063,6 +1065,31 @@ export default function FinanceTab() {
                             <option value="fixe">PC Fixe</option>
                             <option value="portable">Portable</option>
                         </select>
+                        <input
+                            data-testid="stock-serial"
+                            type="text"
+                            value={stockForm.serial}
+                            onChange={(e) => setStockForm({ ...stockForm, serial: e.target.value })}
+                            placeholder="N° série / Case N° (ex: YJ029KR0)"
+                            className="col-span-12 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-yellow-300 text-sm font-mono focus:outline-none"
+                        />
+                        <textarea
+                            data-testid="stock-specs"
+                            value={stockForm.specs}
+                            onChange={(e) => setStockForm({ ...stockForm, specs: e.target.value })}
+                            placeholder={`Format : Portable / PC Fixe
+Écran : 14" / 15,6" / 16" / 17" FHD-LED
+Résolution : 1920x1080 / 2K / 4K / 5K
+Processeur : Intel Core i5 11ᵉ/12ᵉ/13ᵉ/14ᵉ/15ᵉ gén — ou AMD
+Mémoire vive : 8 / 16 Go — DDR4 / DDR5
+Disque : NVMe Hynix 256/512 Go ou plus
+Carte graphique : intégrée / dédiée
+Wifi gen ? (5/6/6E/7) + Bluetooth
+Webcam : avec fermeture vision ? oui / non
+Clavier rétro-éclairé : oui / non`}
+                            rows={7}
+                            className="col-span-12 px-3 py-2 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-gray-300 text-[11px] font-mono leading-relaxed focus:outline-none resize-y"
+                        />
                         <input
                             data-testid="stock-qty"
                             type="number"
@@ -1108,31 +1135,43 @@ export default function FinanceTab() {
                             Stock vide
                         </p>
                     ) : (
-                        <div className="space-y-1 max-h-60 overflow-y-auto">
+                        <div className="space-y-1.5 max-h-96 overflow-y-auto">
                             {stock.items.map((s) => (
                                 <div
                                     key={s.id}
                                     data-testid={`stock-item-${s.id}`}
-                                    className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                    className="bg-[#0d0d0d] border border-[#222222] p-2"
                                 >
-                                    <span className="text-[9px] tracking-[0.15em] uppercase font-mono text-purple-400 w-14 shrink-0">
-                                        {s.kind === "portable" ? "PORT." : "FIXE"}
-                                    </span>
-                                    <span className="flex-1 text-sm text-white truncate">{s.label}</span>
-                                    <span className="font-mono text-[11px] text-gray-400 shrink-0">
-                                        ×{s.quantity}
-                                    </span>
-                                    <span className="font-mono text-sm font-bold text-purple-300 shrink-0">
-                                        {fmt(s.quantity * s.unit_value)} €
-                                    </span>
-                                    <button
-                                        data-testid={`stock-delete-${s.id}`}
-                                        onClick={() => deleteStock(s.id)}
-                                        className="text-gray-500 hover:text-red-500 transition-colors"
-                                        aria-label="Supprimer"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] tracking-[0.15em] uppercase font-mono text-purple-400 w-14 shrink-0">
+                                            {s.kind === "portable" ? "PORT." : "FIXE"}
+                                        </span>
+                                        <span className="flex-1 text-sm text-white truncate">{s.label}</span>
+                                        <span className="font-mono text-[11px] text-gray-400 shrink-0">×{s.quantity}</span>
+                                        {s.unit_value > 0 && (
+                                            <span className="font-mono text-sm font-bold text-purple-300 shrink-0">
+                                                {fmt(s.quantity * s.unit_value)} €
+                                            </span>
+                                        )}
+                                        <button
+                                            data-testid={`stock-delete-${s.id}`}
+                                            onClick={() => deleteStock(s.id)}
+                                            className="text-gray-500 hover:text-red-500 transition-colors"
+                                            aria-label="Supprimer"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                    {s.serial && (
+                                        <div className="text-[10px] text-yellow-400/80 font-mono mt-1 ml-16">
+                                            S/N : {s.serial}
+                                        </div>
+                                    )}
+                                    {s.specs && (
+                                        <pre className="text-[10px] text-gray-400 font-mono mt-1 ml-16 whitespace-pre-wrap leading-relaxed">
+                                            {s.specs}
+                                        </pre>
+                                    )}
                                 </div>
                             ))}
                         </div>
