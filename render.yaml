@@ -12,7 +12,7 @@ services:
     name: benefice-net-backend
     env: python
     region: frankfurt
-    plan: starter
+    plan: free
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn server:app --host 0.0.0.0 --port $PORT"
