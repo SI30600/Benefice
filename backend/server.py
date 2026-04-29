@@ -365,7 +365,8 @@ BALANCE_DOC_ID = "default"
 async def get_balance():
     doc = await db.account_balance.find_one({"_id": BALANCE_DOC_ID}, {"_id": 0})
     if not doc:
-        return {"balance": 0, "updated_at": ""}
+        return {"balance": 0, "cb_deferred": 0, "updated_at": ""}
+    doc.setdefault("cb_deferred", 0)
     return doc
 
 

@@ -84,6 +84,7 @@ export default function FinanceTab() {
             setPending(penR.data);
             setBalance(balR.data);
             setBalanceInput(String(balR.data.balance ?? 0));
+            setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
         } catch (e) {
             console.error(e);
         } finally {
@@ -126,6 +127,7 @@ export default function FinanceTab() {
     const saveBalance = async () => {
         await axios.put(`${API}/finance/balance`, {
             balance: parseFloat(balanceInput) || 0,
+            cb_deferred: parseFloat(cbDeferredInput) || 0,
         });
         refresh();
     };
@@ -136,8 +138,9 @@ export default function FinanceTab() {
     const projected = useMemo(() => {
         if (!cur) return 0;
         const real = parseFloat(balanceInput) || 0;
-        return real + pending.total - cur.total_taxes;
-    }, [balanceInput, pending.total, cur]);
+        const cb = parseFloat(cbDeferredInput) || 0;
+        return real + pending.total - cur.total_taxes - cb;
+    }, [balanceInput, cbDeferredInput, pending.total, cur]);
 
     const CategoryPill = ({ value }) => {
         const map = {
@@ -279,6 +282,21 @@ export default function FinanceTab() {
                                     onChange={(e) => setBalanceInput(e.target.value)}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-lg font-mono font-bold focus:outline-none"
                                 />
+                                <span className="self-center font-mono text-yellow-500">€</span>
+                            </div>
+
+                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
+                                Différé CB (à débiter)
+                            </label>
+                            <div className="flex gap-2 mt-1.5 mb-3">
+                                <input
+                                    data-testid="cb-deferred-input"
+                                    type="number"
+                                    step="0.01"
+                                    value={cbDeferredInput}
+                                    onChange={(e) => setCbDeferredInput(e.target.value)}
+                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
+                                />
                                 <button
                                     data-testid="balance-save"
                                     onClick={saveBalance}
@@ -296,6 +314,7 @@ export default function FinanceTab() {
                             <div className="space-y-2 text-[12px] font-mono pt-3 border-t border-[#333333]">
                                 <div className="flex justify-between"><span className="text-gray-400">Solde réel</span><span className="text-white">{fmt(parseFloat(balanceInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Différé CB</span><span className="text-red-400">−{fmt(parseFloat(cbDeferredInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
