@@ -283,6 +283,16 @@ export default function FinanceTab() {
                                 <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
                                 <StatBox label="Net après taxes" value={cur.net_after_taxes} color="text-green-500" testid="net-after-taxes" />
                             </div>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-ventes">
+                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC ventes</div>
+                                    <div className="font-mono text-base font-semibold text-orange-400 mt-0.5">{fmt(cur.materiel)} €</div>
+                                </div>
+                                <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-presta">
+                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC presta</div>
+                                    <div className="font-mono text-base font-semibold text-blue-400 mt-0.5">{fmt(cur.presta + cur.formation)} €</div>
+                                </div>
+                            </div>
 
                             {prev && (
                                 <div className="mt-4 pt-4 border-t border-[#333333]">
