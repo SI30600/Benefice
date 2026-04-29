@@ -220,7 +220,7 @@ export default function FinanceTab() {
 
                     <a
                         data-testid="btn-declarer-urssaf"
-                        href="https://login-v2.urssaf.fr/"
+                        href="https://www.autoentrepreneur.urssaf.fr/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group flex items-center justify-center gap-3 w-full px-6 py-4 bg-yellow-500 text-black font-mono font-bold tracking-[0.25em] uppercase text-sm hover:bg-yellow-400 transition-colors"
