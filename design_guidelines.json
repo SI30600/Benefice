@@ -1,0 +1,86 @@
+{
+  "theme": "dark",
+  "archetype": "4 (Swiss & High-Contrast / Retro-Futurism Terminal)",
+  "emotional_tone": "Confident, precise, tactical, niche trader vibe",
+  "fonts": {
+    "headings": "Outfit",
+    "body": "Outfit",
+    "mono": "JetBrains Mono"
+  },
+  "colors": {
+    "background": "#0D0D0D",
+    "surface": "#1A1A1A",
+    "surface_elevated": "#262626",
+    "border": "#333333",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#8A8A8A",
+    "accent_profit": "#22C55E",
+    "accent_loss": "#EF4444",
+    "brand_accent": "#EAB308",
+    "urssaf": "#3B82F6",
+    "lbc": "#F97316"
+  },
+  "typography": {
+    "h1": "text-4xl font-bold tracking-tighter text-white",
+    "h2": "text-2xl font-bold tracking-tight text-white",
+    "h3": "text-xl font-semibold tracking-tight text-white",
+    "body": "text-base text-gray-400",
+    "mono_numbers": "font-mono font-medium tracking-tight",
+    "label": "text-xs font-semibold tracking-[0.15em] uppercase text-gray-500"
+  },
+  "spacing": {
+    "section_padding": "py-12 md:py-24",
+    "container_padding": "px-6 md:px-12",
+    "card_padding": "p-6 md:p-8",
+    "gap_small": "gap-4",
+    "gap_medium": "gap-8",
+    "gap_large": "gap-12 md:gap-16"
+  },
+  "layout": {
+    "strategy": "Bento Grid Strategy (Control Room)",
+    "container": "max-w-6xl mx-auto min-h-screen flex flex-col justify-center",
+    "grid": "grid grid-cols-1 lg:grid-cols-12 gap-8 items-start",
+    "form_span": "lg:col-span-7",
+    "result_span": "lg:col-span-5 lg:sticky lg:top-8"
+  },
+  "surfaces": {
+    "card": "bg-[#1A1A1A] border border-[#333333] rounded-none shadow-[0_4px_24px_rgba(0,0,0,0.4)]",
+    "input": "bg-[#0D0D0D] border border-[#333333] rounded-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500/50 text-white font-mono transition-colors",
+    "terminal_card": "bg-[#0D0D0D] border border-[#333333] p-8 rounded-none relative overflow-hidden"
+  },
+  "components": {
+    "form_group": "space-y-2",
+    "label": "text-xs font-semibold tracking-[0.1em] uppercase text-gray-400 block",
+    "input_wrapper": "relative group",
+    "currency_symbol": "absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono",
+    "breakdown_row": "flex justify-between items-center py-3 border-b border-[#333333]/50 last:border-0",
+    "breakdown_label": "text-sm text-gray-400",
+    "breakdown_value": "font-mono text-sm text-white",
+    "profit_container": "mt-6 pt-6 border-t border-[#333333] flex flex-col gap-2",
+    "profit_label": "text-xs font-semibold tracking-[0.2em] uppercase text-gray-500",
+    "profit_value_positive": "font-mono text-5xl tracking-tighter text-[#22C55E]",
+    "profit_value_negative": "font-mono text-5xl tracking-tighter text-[#EF4444]",
+    "margin_badge": "inline-flex items-center px-2 py-1 rounded-none text-xs font-mono border border-current"
+  },
+  "motion": {
+    "hover": "transition-all duration-200 ease-out",
+    "number_ticker": "Use framer-motion to animate number changes smoothly",
+    "appear": "animate-in fade-in slide-in-from-bottom-4 duration-500"
+  },
+  "assets": {
+    "icons": "lucide-react (ShoppingCart, TrendingUp, TrendingDown, Percent, Box, Truck)"
+  },
+  "instructions_to_main_agent": [
+    "Build a single-page React app focusing on the IT reseller use case.",
+    "Do NOT use generic rounded cards. Keep border-radius to 0 (rounded-none) for a tactile, technical terminal vibe.",
+    "Form inputs should be on the left (lg:col-span-7). Include: Nom de l'article, Date, Plateforme de revente (Select), Prix d'achat, Prix de vente, Frais de livraison (default 10).",
+    "Use JetBrains Mono for all numeric inputs and outputs to give it a precise, financial tool look.",
+    "The right side (lg:col-span-5) is the 'Terminal' breakdown. Calculate automatically when inputs change.",
+    "Calculations: Leboncoin Tax = 5% of Prix d'achat. URSSAF = 13% of Prix de vente. Delivery = user input (default 10). Net Profit = Prix vente - Prix achat - LBC Tax - URSSAF - Delivery.",
+    "Show a clear breakdown list: Prix de vente, - Prix d'achat, - Taxe Leboncoin (5%), - Livraison, - URSSAF (13%). Then a massive NET PROFIT at the bottom.",
+    "Color-code the NET PROFIT: text-green-500 if > 0, text-red-500 if < 0. Provide a margin % badge next to it.",
+    "Add a subtle 'noise' or 'grain' texture over the background if possible, or keep it strictly clean matte black/charcoal.",
+    "Use data-testid on all interactive elements (inputs, breakdown rows, net profit) for testing.",
+    "Ensure high contrast and accessibility."
+  ]
+}
