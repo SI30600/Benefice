@@ -3,8 +3,9 @@ import axios from "axios";
 import {
     Wallet, Plus, Trash2, Calendar, ArrowDownToLine, ArrowUpFromLine,
     AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
-    FileCheck2, ExternalLink,
+    FileCheck2, ExternalLink, TrendingUp,
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -324,6 +325,49 @@ export default function FinanceTab() {
             - chargesUpcomingTotal
         );
     }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal]);
+
+    // Courbe prévisionnelle jour par jour du mois courant
+    const projectionData = useMemo(() => {
+        if (!cur) return [];
+        const now = new Date();
+        const year = now.getFullYear();
+        const monthIdx = now.getMonth();
+        const lastDay = new Date(year, monthIdx + 1, 0).getDate();
+        const curDay = now.getDate();
+
+        const real = parseFloat(balanceInput) || 0;
+        const cb = parseFloat(cbDeferredInput) || 0;
+        // Point de départ = ce que j'ai vraiment sur le compte aujourd'hui
+        // Les paiements attendus & achats LBC sont considérés "immédiats" (date inconnue)
+        // On absorbe les taxes à la fin du mois (déclaration URSSAF tombe déjà via charges récurrentes)
+        const startToday = real - cb + pending.total - lbcList.total;
+
+        // Événements datés : charges (-) et revenus récurrents (+)
+        const eventsByDay = {};
+        (charges.items || []).forEach((c) => {
+            if (c.day_of_month >= curDay && c.day_of_month <= lastDay) {
+                eventsByDay[c.day_of_month] = (eventsByDay[c.day_of_month] || 0) - (c.amount || 0);
+            }
+        });
+        (revenues.items || []).forEach((r) => {
+            if (!r.prepaid && r.day_of_month >= curDay && r.day_of_month <= lastDay) {
+                eventsByDay[r.day_of_month] = (eventsByDay[r.day_of_month] || 0) + (r.amount || 0);
+            }
+        });
+
+        const points = [];
+        let running = startToday;
+        for (let d = curDay; d <= lastDay; d++) {
+            running += eventsByDay[d] || 0;
+            points.push({ day: d, solde: Math.round(running * 100) / 100 });
+        }
+        return points;
+    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur]);
+
+    const projectionMin = useMemo(
+        () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
+        [projectionData]
+    );
 
     const CategoryPill = ({ value }) => {
         const map = {
@@ -789,6 +833,64 @@ export default function FinanceTab() {
                     )}
                 </SectionCard>
             </div>
+
+            {/* Courbe prévisionnelle du mois */}
+            <SectionCard>
+                <SectionTitle icon={TrendingUp} accent="text-cyan-400">
+                    Prévisionnel jour par jour · {monthLabel(month)}
+                </SectionTitle>
+                <p className="text-[10px] text-gray-500 font-mono mb-4">
+                    Projection du solde dispo de aujourd'hui à la fin du mois — tient compte des prélèvements et abos datés
+                    {projectionMin < 0 && (
+                        <span className="ml-2 text-red-400">⚠ point bas prévu : {fmt(projectionMin)} €</span>
+                    )}
+                </p>
+
+                {projectionData.length === 0 ? (
+                    <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed">
+                        Pas de données à projeter
+                    </p>
+                ) : (
+                    <div className="h-72 w-full" data-testid="projection-chart">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={projectionData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                                <XAxis
+                                    dataKey="day"
+                                    stroke="#666"
+                                    tick={{ fill: "#888", fontSize: 11, fontFamily: "monospace" }}
+                                    tickFormatter={(d) => String(d).padStart(2, "0")}
+                                />
+                                <YAxis
+                                    stroke="#666"
+                                    tick={{ fill: "#888", fontSize: 11, fontFamily: "monospace" }}
+                                    tickFormatter={(v) => `${Math.round(v)} €`}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        background: "#0d0d0d",
+                                        border: "1px solid #333",
+                                        fontFamily: "monospace",
+                                        fontSize: 12,
+                                    }}
+                                    labelStyle={{ color: "#eab308" }}
+                                    labelFormatter={(d) => `Jour ${String(d).padStart(2, "0")}`}
+                                    formatter={(value) => [`${fmt(value)} €`, "Solde projeté"]}
+                                />
+                                <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
+                                <Line
+                                    type="monotone"
+                                    dataKey="solde"
+                                    stroke="#22d3ee"
+                                    strokeWidth={2}
+                                    dot={{ fill: "#22d3ee", r: 3 }}
+                                    activeDot={{ r: 5 }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
+            </SectionCard>
 
             {/* Charges mensuelles + Abonnements clients récurrents */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
