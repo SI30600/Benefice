@@ -1,0 +1,38 @@
+{
+  "summary": "Full backend regression on the secured Microsoft 365 portal. 32/32 pytest tests passed against the public preview URL, covering: auth gating on all /api/finance/* + /api/auth/portal/me (no token, invalid token), single-tenant /api/auth/portal/login auth_url validation (tenant 7f008f30-09bb-4ffe-b661-fa76376ab364, NOT /common or /organizations), full E2E with a manually-injected portal_sessions doc (token=TEST_AUTH_TOKEN_E2E), CRUD on finance entries, LBC purchases, balance update with persistence verification, and confirmation that all OneDrive routes return 404.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/finance/lbc-purchases", "issue": "Test plan #12 specified payload {amount:45.0} only, but LbcPurchaseCreate model requires `label` (returns 422). Tested both: with label -> 200 OK; amount-only -> 422 (validated as expected). Frontend must always send `label`."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Confirm with main agent: should LbcPurchaseCreate.label be optional (default '') to match the original test plan payload? Currently it is required."
+  ],
+  "critical_code_review_comments": [
+    "server.py: AccountBalance PUT echoes the raw user input including `updated_at` overwrite — server forces updated_at=now_iso() which is correct, but the response returns the dict (not a Pydantic-validated model). Fine for this scope.",
+    "portal_auth.is_session_active: tolerates malformed expires_at by returning False (good), but no token revocation API beyond /auth/portal/logout. Acceptable for single-user portal.",
+    "require_auth: token comparison is by direct equality on a long random secrets.token_urlsafe(48) — adequate (timing-safe not strictly required at this entropy level), but a constant-time compare would be a cheap hardening.",
+    "MS_CLIENT_SECRET is committed in /app/backend/.env. Standard for preview env; ensure rotation before production.",
+    "No rate limiting on /api/auth/portal/login (state docs accumulate in MongoDB). Consider TTL index on portal_states.created_at."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "n/a (not in scope)"},
+  "test_credentials": "Manually injected portal_sessions doc: token=TEST_AUTH_TOKEN_E2E, email=contact@solutioninformatique.fr, expires_at=now+30d. Real Microsoft OAuth flow not exercised (interactive).",
+  "seed_data_creation": "Test session inserted into portal_sessions at module setup, deleted at teardown. All CRUD test data prefixed TEST_E2E_ and cleaned up (entry, lbc purchase, balance restored to original snapshot).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "backend_test.py is parametrised and idempotent (cleans up portal_sessions, finance_entries, lbc_purchases, account_balance restore). Run with: pytest /app/backend/tests/backend_test.py -v. Uses REACT_APP_BACKEND_URL from frontend/.env and MONGO_URL/DB_NAME/MS_TENANT_ID/PORTAL_ALLOWED_EMAIL from backend/.env. The Microsoft OAuth interactive flow is MOCKED via direct MongoDB session injection — real /api/auth/portal/callback was NOT exercised.",
+  "rca of the issue": "No bugs found. All 14 functional scenarios from the request validated. Single-tenant configuration confirmed: auth_url path contains /7f008f30-09bb-4ffe-b661-fa76376ab364/oauth2/v2.0/authorize. OneDrive routes fully removed (404 on all 4 legacy paths)."
+}
