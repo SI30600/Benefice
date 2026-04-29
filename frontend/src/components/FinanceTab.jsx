@@ -594,9 +594,16 @@ export default function FinanceTab() {
                                     step="0.01"
                                     value={balanceInput}
                                     onChange={(e) => setBalanceInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") saveBalance(); }}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-lg font-mono font-bold focus:outline-none"
                                 />
-                                <span className="self-center font-mono text-yellow-500">€</span>
+                                <button
+                                    data-testid="balance-save-top"
+                                    onClick={saveBalance}
+                                    className="px-3 bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-yellow-400"
+                                >
+                                    OK
+                                </button>
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
@@ -609,6 +616,7 @@ export default function FinanceTab() {
                                     step="0.01"
                                     value={cbDeferredInput}
                                     onChange={(e) => setCbDeferredInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") saveBalance(); }}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
                                 />
                                 <button
