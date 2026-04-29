@@ -332,27 +332,20 @@ export default function FinanceTab() {
                             </label>
                             <div className="grid grid-cols-12 gap-2 mt-1.5 mb-2">
                                 <input
-                                    data-testid="lbc-purchase-label"
-                                    type="text"
-                                    value={lbcForm.label}
-                                    onChange={(e) => setLbcForm({ ...lbcForm, label: e.target.value })}
-                                    placeholder="Description (RTX 3070, RAM…)"
-                                    className="col-span-6 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-xs focus:outline-none"
-                                />
-                                <input
                                     data-testid="lbc-purchase-amount"
                                     type="number"
                                     step="0.01"
                                     min="0"
                                     value={lbcForm.amount}
                                     onChange={(e) => setLbcForm({ ...lbcForm, amount: e.target.value })}
-                                    placeholder="€"
-                                    className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-sm font-mono font-bold focus:outline-none"
+                                    onKeyDown={(e) => { if (e.key === "Enter") addLbcPurchase(); }}
+                                    placeholder="Montant €"
+                                    className="col-span-8 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-base font-mono font-bold focus:outline-none"
                                 />
                                 <button
                                     data-testid="lbc-purchase-add"
                                     onClick={addLbcPurchase}
-                                    className="col-span-3 h-10 bg-red-600 hover:bg-red-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                                    className="col-span-4 h-10 bg-red-600 hover:bg-red-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
                                 >
                                     <Plus className="h-3.5 w-3.5" />
                                     Ajouter
@@ -361,16 +354,16 @@ export default function FinanceTab() {
 
                             {lbcList.items.length > 0 && (
                                 <div className="space-y-1 max-h-40 overflow-y-auto mb-3">
-                                    {lbcList.items.map((p) => (
+                                    {lbcList.items.map((p, idx) => (
                                         <div
                                             key={p.id}
                                             data-testid={`lbc-item-${p.id}`}
                                             className="flex items-center justify-between gap-2 px-2 py-1.5 bg-[#0d0d0d] border border-[#222222]"
                                         >
-                                            <span className="text-[11px] text-gray-300 truncate flex-1">
-                                                {p.label}
+                                            <span className="text-[10px] text-gray-500 font-mono shrink-0 w-6">
+                                                #{lbcList.items.length - idx}
                                             </span>
-                                            <span className="font-mono text-xs font-bold text-red-400 shrink-0">
+                                            <span className="font-mono text-sm font-bold text-red-400 flex-1 text-right">
                                                 {fmt(p.amount)} €
                                             </span>
                                             <button
