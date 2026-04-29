@@ -71,10 +71,32 @@ export default function FinanceTab() {
     const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
     const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
-    // URSSAF à payer le 4 de M+1 : auto-calculée depuis summary.previous, override manuel possible
+    // URSSAF à payer le 4 de M+1 : override manuel valable uniquement pour le mois courant
+    // Format localStorage: "YYYY-MM|montant" — dès qu'on change de mois, l'override expire
     const [urssafNextOverride, setUrssafNextOverride] = useState(() => {
-        try { return localStorage.getItem("urssaf_next_override") || ""; } catch { return ""; }
+        try {
+            const raw = localStorage.getItem("urssaf_next_override") || "";
+            if (!raw) return "";
+            // Legacy : anciennes valeurs sans préfixe mois — on les considère expirées
+            if (!raw.includes("|")) return "";
+            const [savedMonth, val] = raw.split("|");
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            return savedMonth === currentMonth ? val : "";
+        } catch { return ""; }
     });
+
+    const saveUrssafOverride = (val) => {
+        try {
+            if (!val || parseFloat(val) <= 0) {
+                localStorage.removeItem("urssaf_next_override");
+            } else {
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                localStorage.setItem("urssaf_next_override", `${currentMonth}|${val}`);
+            }
+        } catch {
+            // localStorage unavailable
+        }
+    };
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -754,18 +776,14 @@ export default function FinanceTab() {
                                     value={urssafNextOverride}
                                     onChange={(e) => setUrssafNextOverride(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            try { localStorage.setItem("urssaf_next_override", urssafNextOverride); } catch {}
-                                        }
+                                        if (e.key === "Enter") saveUrssafOverride(urssafNextOverride);
                                     }}
                                     placeholder={summary?.previous?.total_taxes ? `auto : ${fmt(summary.previous.total_taxes)}` : "Ex: 483"}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-orange-500 text-orange-400 text-lg font-mono font-bold focus:outline-none"
                                 />
                                 <button
                                     data-testid="urssaf-next-save"
-                                    onClick={() => {
-                                        try { localStorage.setItem("urssaf_next_override", urssafNextOverride); } catch {}
-                                    }}
+                                    onClick={() => saveUrssafOverride(urssafNextOverride)}
                                     className="px-3 bg-orange-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-orange-400"
                                 >
                                     OK
@@ -773,8 +791,8 @@ export default function FinanceTab() {
                             </div>
                             <div className="text-[9px] text-gray-500 font-mono mb-3">
                                 {urssafNextOverride
-                                    ? `Valeur manuelle · auto-calculée : ${fmt(summary?.previous?.total_taxes || 0)} €`
-                                    : `Laissez vide pour utiliser l'auto-calcul (${fmt(summary?.previous?.total_taxes || 0)} €)`}
+                                    ? `Valeur manuelle (${monthLabel(month).split(" ")[0]}) · auto : ${fmt(summary?.previous?.total_taxes || 0)} €`
+                                    : `Auto-calcul depuis CA ${summary?.previous_month ? monthLabel(summary.previous_month) : "M-1"} (${fmt(summary?.previous?.total_taxes || 0)} €)`}
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
