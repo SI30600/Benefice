@@ -369,6 +369,16 @@ export default function FinanceTab() {
             }
         });
 
+        // URSSAF : prélèvement le 4 du mois suivant, montant = taxes du mois courant
+        if (cur.total_taxes > 0) {
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 4);
+            const daysDiff = Math.floor((nextMonth - now) / (1000 * 60 * 60 * 24));
+            if (daysDiff >= 0 && daysDiff <= HORIZON_DAYS) {
+                const key = nextMonth.toISOString().slice(0, 10);
+                if (key in eventsByDate) eventsByDate[key] -= cur.total_taxes;
+            }
+        }
+
         const keys = Object.keys(eventsByDate).sort();
         const points = [];
         let running = startToday;
@@ -862,12 +872,7 @@ export default function FinanceTab() {
                     Prévisionnel glissant · 30 prochains jours
                 </SectionTitle>
                 <p className="text-[10px] text-gray-500 font-mono mb-4">
-                    Projection du solde dispo sur les 30 prochains jours — inclut les prélèvements et abos récurrents datés
-                    {cur && cur.total_taxes > 0 && (
-                        <span className="ml-2 text-yellow-500">
-                            · ligne jaune = réserve URSSAF M+1 ({fmt(cur.total_taxes)} €)
-                        </span>
-                    )}
+                    Projection du solde dispo sur les 30 prochains jours — inclut prélèvements, abos récurrents et URSSAF du mois
                     {projectionMin < 0 && (
                         <span className="ml-2 text-red-400">⚠ point bas prévu : {fmt(projectionMin)} €</span>
                     )}
@@ -906,19 +911,6 @@ export default function FinanceTab() {
                                     formatter={(value) => [`${fmt(value)} €`, "Solde projeté"]}
                                 />
                                 <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "0 €", fill: "#ef4444", fontSize: 10, position: "insideRight" }} />
-                                {cur && cur.total_taxes > 0 && (
-                                    <ReferenceLine
-                                        y={cur.total_taxes}
-                                        stroke="#eab308"
-                                        strokeDasharray="4 4"
-                                        label={{
-                                            value: `Réserve URSSAF M+1 : ${fmt(cur.total_taxes)} €`,
-                                            fill: "#eab308",
-                                            fontSize: 10,
-                                            position: "insideTopRight",
-                                        }}
-                                    />
-                                )}
                                 <Line
                                     type="monotone"
                                     dataKey="solde"
