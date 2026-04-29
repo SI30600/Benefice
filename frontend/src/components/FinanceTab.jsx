@@ -220,7 +220,7 @@ export default function FinanceTab() {
 
                     <a
                         data-testid="btn-declarer-urssaf"
-                        href="https://www.autoentrepreneur.urssaf.fr/"
+                        href="https://login-v2.urssaf.fr/api/oauth/v1/providerLogin?requestOrigin=response_type%3Dcode%26client_id%3DWEBAE-BDS%26state%3D2varjhLGUiDRE62JePHhR4ih4Rz087jsjxF1qMvJeUX%26redirect_uri%3Dhttps%3A%2F%2Fwww.autoentrepreneur.urssaf.fr%2Fservices%2Fcallback%3Faction%3Dlogin%26END%3DTRUE%26scope%3Dopenid%2Bbeae.api%2Bcfe.norme%2Bcfe.rpa%2Bteledep.declaration%2Bteledep.declarations%2Bteledep.mandat%2Bteledep.paiement%2Bannabel.password%2Boffline_access%26code_challenge%3DHfGzPitjtm8eWWFH1MZ4ftrMockDl3bCMI9cXmHhzL8%26code_challenge_method%3DS256%26nonce%3DYWb38zaDSsLKt084v9SMvh22GCDYQcqLlvrVhvQLkRr%26apm.clientId%3Dcd65d646-7564-4e25-8f6a-95281c723980%26ns%3DYw0yGYlZSXLEmXc2iq3p2ngtupOptQ7C1EmwUGETb8e6%2BNqTZ3B956PD033tthsfTNIuy8JtRERmE6On8iCqsbXKXjQiMl%2FUuGeH4UMoyzOQqMA8CuduaCwAKVd1XitT2xFctO4gnVfmDo%2Bny1DKakz1GCU%2BS8DaqCwIe3n5aB0%3D"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group flex items-center justify-center gap-3 w-full px-6 py-4 bg-yellow-500 text-black font-mono font-bold tracking-[0.25em] uppercase text-sm hover:bg-yellow-400 transition-colors"
