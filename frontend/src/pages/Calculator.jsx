@@ -96,6 +96,8 @@ export default function Calculator() {
         // Articles (13%)
         licenseWindows: true,
         amountLicense: "100",
+        officePro: false,
+        amountOffice: "110",
         // Prestations (23%) — radio: "withData" | "withoutData" | "none"
         serviceVariant: "withData",
         amountWithData: "60",
@@ -119,6 +121,7 @@ export default function Calculator() {
         const partsShipping = parseFloat(asm.partsShipping) || 0;
 
         const licenseFee = asm.licenseWindows ? parseFloat(asm.amountLicense) || 0 : 0;
+        const officeFee = asm.officePro ? parseFloat(asm.amountOffice) || 0 : 0;
 
         let serviceFee = 0;
         let serviceLabel = "";
@@ -134,7 +137,7 @@ export default function Calculator() {
         const travel = travelObj?.price || 0;
 
         // Articles bucket (13%)
-        const articlesTotal = +(partsSale + licenseFee).toFixed(2);
+        const articlesTotal = +(partsSale + licenseFee + officeFee).toFixed(2);
         // Prestations bucket (23%)
         const prestationsTotal = +(serviceFee + travel).toFixed(2);
 
@@ -150,7 +153,7 @@ export default function Calculator() {
 
         return {
             partsCost, partsSale, lbcTax, partsShipping,
-            licenseFee, serviceFee, serviceLabel, travel,
+            licenseFee, officeFee, serviceFee, serviceLabel, travel,
             travelLabel: travelObj?.label,
             articlesTotal, prestationsTotal,
             urssafArticles, urssafPrestations, urssaf,
@@ -295,6 +298,7 @@ export default function Calculator() {
                                         partsSale: asmCalc.partsSale,
                                         partsShipping: asmCalc.partsShipping,
                                         licenseFee: asmCalc.licenseFee,
+                                        officeFee: asmCalc.officeFee,
                                         serviceFee: asmCalc.serviceFee,
                                         serviceLabel: asmCalc.serviceLabel,
                                         travelLabel: asmCalc.travelLabel || "",

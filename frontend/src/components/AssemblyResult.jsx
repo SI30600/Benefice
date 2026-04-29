@@ -149,6 +149,16 @@ export default function AssemblyResult({ calc, clientName }) {
                             accent="#F97316"
                         />
                     )}
+                    {calc.officeFee > 0 && (
+                        <Row
+                            testid="asm-row-office"
+                            label="Microsoft Office 2024 Pro Plus"
+                            value={calc.officeFee}
+                            sign="+"
+                            color="text-orange-400"
+                            accent="#F97316"
+                        />
+                    )}
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#333333]">
                         <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-orange-300">
                             Sous-total articles

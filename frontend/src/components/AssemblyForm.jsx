@@ -1,6 +1,6 @@
 import {
     User, Calendar as CalendarIcon, Monitor, Laptop,
-    MapPin, Wrench, HardDrive, Phone, Mail, Home, Cpu, MemoryStick, Plug, Box, Keyboard, Package, KeyRound, Truck,
+    MapPin, Wrench, HardDrive, Phone, Mail, Home, Cpu, MemoryStick, Plug, Box, Keyboard, Package, KeyRound, Truck, FileText,
 } from "lucide-react";
 
 const ICON_MAP = {
@@ -449,6 +449,19 @@ export default function AssemblyForm({
                     badgeColor="border-orange-500/50 text-orange-400"
                 />
 
+                <ServiceCard
+                    testid="asm-office"
+                    active={asm.officePro}
+                    onToggle={() => setAsm((s) => ({ ...s, officePro: !s.officePro }))}
+                    icon={FileText}
+                    title="Microsoft Office 2024 Professionnel Plus"
+                    description="Suite bureautique complète (Word, Excel, PowerPoint, Outlook…) — article."
+                    amount={asm.amountOffice}
+                    onAmountChange={update("amountOffice")}
+                    badge="ARTICLE"
+                    badgeColor="border-orange-500/50 text-orange-400"
+                />
+
                 {/* Premier démarrage — radio entre 2 variantes */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
@@ -584,6 +597,8 @@ export default function AssemblyForm({
                             componentsPortable: blank(portableComponents),
                             licenseWindows: true,
                             amountLicense: "100",
+                            officePro: false,
+                            amountOffice: "110",
                             serviceVariant: "withData",
                             amountWithData: "60",
                             amountWithoutData: "40",

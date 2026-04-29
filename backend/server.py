@@ -61,6 +61,7 @@ class DevisPayload(BaseModel):
     partsSale: float = 0
     partsShipping: float = 0
     licenseFee: float = 0
+    officeFee: float = 0
     serviceFee: float = 0
     serviceLabel: str = ""
     travelLabel: str = ""
@@ -214,6 +215,7 @@ async def save_devis(payload: DevisPayload = Body(...)):
         payload.partsSale,
         payload.partsShipping,
         payload.licenseFee,
+        payload.officeFee,
         payload.serviceLabel,
         payload.serviceFee,
         payload.travelLabel,
@@ -233,7 +235,12 @@ async def save_devis(payload: DevisPayload = Body(...)):
         raise HTTPException(status_code=500, detail=f"Erreur OneDrive: {e}") from e
 
     # Auto-feed Finance ledger : create entries from this devis
-    materiel_amount = round(float(payload.partsSale or 0) + float(payload.licenseFee or 0), 2)
+    materiel_amount = round(
+        float(payload.partsSale or 0)
+        + float(payload.licenseFee or 0)
+        + float(payload.officeFee or 0),
+        2,
+    )
     presta_amount = round(float(payload.serviceFee or 0) + float(payload.travelAmount or 0), 2)
     auto_entries = []
     if materiel_amount > 0:
