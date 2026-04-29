@@ -3,6 +3,7 @@ import axios from "axios";
 import {
     Wallet, Plus, Trash2, Calendar, ArrowDownToLine, ArrowUpFromLine,
     AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
+    FileCheck2, ExternalLink,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -184,34 +185,62 @@ export default function FinanceTab() {
 
             {cur && (
                 <>
-                    {/* Big stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
-                        <StatBox label="Prestations" value={cur.presta} color="text-blue-400" testid="ca-presta" />
-                        <StatBox label="Matériel" value={cur.materiel} color="text-orange-400" testid="ca-materiel" />
-                        <StatBox label="Formation" value={cur.formation} color="text-purple-400" testid="ca-formation" />
+                    {/* 2 grandes cartes : exactement les 2 cases de la déclaration URSSAF */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div
+                            data-testid="bic-ventes-card"
+                            className="bg-[#0d0d0d] border border-orange-500/40 p-6 relative"
+                        >
+                            <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-orange-400 mb-1">
+                                Montant BIC ventes
+                            </div>
+                            <div className="text-[11px] text-gray-500 font-mono mb-3 leading-relaxed">
+                                Ventes de marchandises (matériel)
+                            </div>
+                            <div className="font-mono text-4xl md:text-5xl font-bold text-orange-400 tracking-tight">
+                                {fmt(cur.materiel)} <span className="text-2xl text-gray-500">€</span>
+                            </div>
+                        </div>
+
+                        <div
+                            data-testid="bic-prestations-card"
+                            className="bg-[#0d0d0d] border border-blue-500/40 p-6 relative"
+                        >
+                            <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-blue-400 mb-1">
+                                Montant BIC prestations
+                            </div>
+                            <div className="text-[11px] text-gray-500 font-mono mb-3 leading-relaxed">
+                                Prestations de services commerciales ou artisanales
+                            </div>
+                            <div className="font-mono text-4xl md:text-5xl font-bold text-blue-400 tracking-tight">
+                                {fmt(cur.presta + cur.formation)} <span className="text-2xl text-gray-500">€</span>
+                            </div>
+                        </div>
                     </div>
 
+                    <a
+                        data-testid="btn-declarer-urssaf"
+                        href="https://login-v2.urssaf.fr/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center justify-center gap-3 w-full px-6 py-4 bg-yellow-500 text-black font-mono font-bold tracking-[0.25em] uppercase text-sm hover:bg-yellow-400 transition-colors"
+                    >
+                        <FileCheck2 className="h-5 w-5" />
+                        <span>Déclarer sur urssaf.fr</span>
+                        <ExternalLink className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    </a>
+
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* URSSAF detail */}
+                        {/* Récapitulatif compact */}
                         <SectionCard className="lg:col-span-2">
-                            <SectionTitle icon={Receipt}>Taxes du mois</SectionTitle>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                                <StatBox label="URSSAF Presta" value={cur.urssaf_presta} color="text-blue-400" testid="urssaf-presta" />
-                                <StatBox label="URSSAF Matériel" value={cur.urssaf_materiel} color="text-orange-400" testid="urssaf-materiel" />
-                                <StatBox label="URSSAF Formation" value={cur.urssaf_formation} color="text-purple-400" testid="urssaf-formation" />
-                                <StatBox label="Impôt Presta" value={cur.impot_presta} color="text-blue-300" testid="impot-presta" />
-                                <StatBox label="Impôt Vente" value={cur.impot_vente} color="text-orange-300" testid="impot-vente" />
-                                <StatBox label="Formation pro" value={cur.cfp} color="text-yellow-400" testid="cfp" sub="sur tout le CA" />
+                            <SectionTitle icon={Receipt}>Récapitulatif</SectionTitle>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
+                                <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
+                                <StatBox label="Net après taxes" value={cur.net_after_taxes} color="text-green-500" testid="net-after-taxes" />
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-[#333333]">
-                                <StatBox label="URSSAF total" value={cur.total_urssaf} color="text-white" testid="total-urssaf" />
-                                <StatBox label="Impôt total" value={cur.total_impot} color="text-white" testid="total-impot" />
-                                <StatBox label="Total à payer" value={cur.total_taxes} color="text-red-400" testid="total-taxes" />
-                            </div>
-
-                            {prev && (
+                            {prev && (prev.total_ca > 0) && (
                                 <div className="mt-4 pt-4 border-t border-[#333333]">
                                     <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 mb-2">
                                         Comparaison · {monthLabel(summary.previous_month)}
@@ -222,12 +251,12 @@ export default function FinanceTab() {
                                             <div className="text-gray-200 mt-0.5">{fmt(prev.total_ca)} €</div>
                                         </div>
                                         <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">URSSAF préc.</div>
-                                            <div className="text-gray-200 mt-0.5">{fmt(prev.total_urssaf)} €</div>
+                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">BIC ventes préc.</div>
+                                            <div className="text-orange-300 mt-0.5">{fmt(prev.materiel)} €</div>
                                         </div>
                                         <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">Total taxes préc.</div>
-                                            <div className="text-red-300 mt-0.5">{fmt(prev.total_taxes)} €</div>
+                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">BIC presta préc.</div>
+                                            <div className="text-blue-300 mt-0.5">{fmt(prev.presta + prev.formation)} €</div>
                                         </div>
                                     </div>
                                 </div>
