@@ -37,5 +37,7 @@ services:
         sync: false
       - key: PORTAL_REDIRECT_URI
         sync: false
+      - key: FRONTEND_URL
+        sync: false
       - key: PORTAL_ALLOWED_EMAIL
         sync: false

@@ -78,7 +78,7 @@ async def portal_login():
 @api_router.get("/auth/portal/callback")
 async def portal_callback(code: Optional[str] = None, state: Optional[str] = None,
                           error: Optional[str] = None, error_description: Optional[str] = None):
-    spa_root = os.environ["PORTAL_REDIRECT_URI"].replace("/api/auth/portal/callback", "")
+    spa_root = os.environ.get("FRONTEND_URL") or os.environ["PORTAL_REDIRECT_URI"].replace("/api/auth/portal/callback", "")
 
     if error:
         return RedirectResponse(f"{spa_root}/?portal_error={error}")
