@@ -4,8 +4,8 @@ import CalcForm from "@/components/CalcForm";
 import ResultPanel from "@/components/ResultPanel";
 import AssemblyForm from "@/components/AssemblyForm";
 import AssemblyResult from "@/components/AssemblyResult";
-import OneDrivePanel from "@/components/OneDrivePanel";
 import FinanceTab from "@/components/FinanceTab";
+import SaveDevisPanel from "@/components/SaveDevisPanel";
 
 export const TRAVEL_OPTIONS = [
     { key: "vauvert", label: "Vauvert", price: 10, hint: "Local" },
@@ -276,39 +276,19 @@ export default function Calculator() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-7">
-                            <OneDrivePanel
-                                getDevisPayload={() => {
-                                    if (!asmCalc.hasData && !asm.clientName) return null;
-                                    const compDetail = asmCalc.componentsBreakdown
-                                        .map((c) =>
-                                            `${c.label}${c.name ? ` (${c.name})` : ""}: ${c.cost.toFixed(2)}€`
-                                        )
-                                        .join(" | ");
+                            <SaveDevisPanel
+                                getDevisData={() => {
+                                    if (!asmCalc.hasData) return null;
                                     return {
                                         date: asm.date,
                                         clientName: asm.clientName,
-                                        clientAddress: asm.clientAddress,
-                                        clientPostal: asm.clientPostal,
-                                        clientCity: asm.clientCity,
-                                        clientPhone: asm.clientPhone,
-                                        clientEmail: asm.clientEmail,
-                                        machineType: asm.machineType,
-                                        componentsDetail: compDetail,
-                                        partsCost: asmCalc.partsCost,
                                         partsSale: asmCalc.partsSale,
-                                        partsShipping: asmCalc.partsShipping,
                                         licenseFee: asmCalc.licenseFee,
                                         officeFee: asmCalc.officeFee,
                                         serviceFee: asmCalc.serviceFee,
                                         serviceLabel: asmCalc.serviceLabel,
                                         travelLabel: asmCalc.travelLabel || "",
                                         travelAmount: asmCalc.travel,
-                                        totalBilled: asmCalc.totalBilled,
-                                        lbcTax: asmCalc.lbcTax,
-                                        urssafArticles: asmCalc.urssafArticles,
-                                        urssafPrestations: asmCalc.urssafPrestations,
-                                        netProfit: asmCalc.netProfit,
-                                        margin: asmCalc.margin,
                                     };
                                 }}
                             />
