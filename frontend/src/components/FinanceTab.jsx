@@ -261,6 +261,23 @@ export default function FinanceTab() {
                             <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-yellow-500 mb-2">
                                 {monthLabel(month)} (en cours)
                             </div>
+
+                            {/* Bénéfice net en poche — chiffre HERO du mois */}
+                            <div
+                                data-testid="net-pocket-current"
+                                className="bg-[#0d0d0d] border border-green-500/40 p-5 mb-3 relative overflow-hidden"
+                            >
+                                <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-green-400 mb-1">
+                                    Dans ta poche ce mois-ci
+                                </div>
+                                <div className="text-[11px] text-gray-500 font-mono mb-2">
+                                    CA − URSSAF − impôts − CFP
+                                </div>
+                                <div className="font-mono text-4xl md:text-5xl font-bold text-green-500 tracking-tight">
+                                    {fmt(cur.net_after_taxes)} <span className="text-2xl text-gray-500">€</span>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
                                 <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
@@ -272,6 +289,19 @@ export default function FinanceTab() {
                                     <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-400 mb-2">
                                         {monthLabel(summary.previous_month)} (mois précédent)
                                     </div>
+
+                                    <div
+                                        data-testid="net-pocket-previous"
+                                        className="bg-[#0d0d0d] border border-green-500/25 p-4 mb-3"
+                                    >
+                                        <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-green-400/80 mb-1">
+                                            Dans ta poche
+                                        </div>
+                                        <div className="font-mono text-2xl md:text-3xl font-bold text-green-400/90 tracking-tight">
+                                            {fmt(prev.net_after_taxes)} <span className="text-lg text-gray-500">€</span>
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                         <StatBox label="CA Total" value={prev.total_ca} color="text-yellow-300/80" testid="prev-ca-total" />
                                         <StatBox label="Total taxes" value={prev.total_taxes} color="text-red-300/80" testid="prev-total-taxes" />
