@@ -1,0 +1,41 @@
+# Render Blueprint — backend FastAPI Bénéfice.NET
+# https://render.com/docs/blueprint-spec
+#
+# Pour déployer : sur Render → New + → Blueprint → connecte ton repo GitHub
+# Render lira ce fichier et créera automatiquement le service.
+#
+# ⚠️ Toutes les variables marquées `sync: false` doivent être renseignées
+# manuellement dans le dashboard Render après le 1er déploiement.
+
+services:
+  - type: web
+    name: benefice-net-backend
+    env: python
+    region: frankfurt
+    plan: starter
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn server:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: benefice_net
+      - key: CORS_ORIGINS
+        sync: false
+      - key: MS_CLIENT_ID
+        sync: false
+      - key: MS_CLIENT_SECRET
+        sync: false
+      - key: MS_TENANT_ID
+        sync: false
+      - key: MS_AUTHORITY
+        sync: false
+      - key: PORTAL_REDIRECT_URI
+        sync: false
+      - key: PORTAL_ALLOWED_EMAIL
+        sync: false
