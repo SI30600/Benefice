@@ -326,10 +326,10 @@ export default function FinanceTab() {
         );
     }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal]);
 
-    // Courbe prévisionnelle : 30 jours glissants (aujourd'hui → J+30)
+    // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
         if (!cur) return [];
-        const HORIZON_DAYS = 30;
+        const HORIZON_DAYS = 90;
         const now = new Date();
         const curDay = now.getDate();
 
@@ -338,8 +338,7 @@ export default function FinanceTab() {
         // Point de départ = cash réellement dispo aujourd'hui (+ pending à encaisser, − LBC à payer bientôt)
         const startToday = real - cb + pending.total - lbcList.total;
 
-        // Pré-construit les événements pour les 30 prochains jours
-        // (pour chaque date réelle dans l'horizon, somme charges/revenus récurrents tombant ce jour)
+        // Pré-construit les événements pour les N prochains jours
         const eventsByDate = {};
         for (let i = 0; i <= HORIZON_DAYS; i++) {
             const d = new Date(now);
@@ -369,7 +368,8 @@ export default function FinanceTab() {
             }
         });
 
-        // URSSAF : prélèvement le 4 du mois suivant, montant = taxes du mois courant
+        // URSSAF : prélevée le 4 du mois suivant, montant = taxes du mois courant
+        // Pour les mois suivants, on n'a pas encore le CA → on n'inclut que la prochaine échéance certaine
         if (cur.total_taxes > 0) {
             const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 4);
             const daysDiff = Math.floor((nextMonth - now) / (1000 * 60 * 60 * 24));
@@ -877,10 +877,10 @@ export default function FinanceTab() {
             {/* Courbe prévisionnelle du mois */}
             <SectionCard>
                 <SectionTitle icon={TrendingUp} accent="text-cyan-400">
-                    Prévisionnel glissant · 30 prochains jours
+                    Prévisionnel glissant · 90 prochains jours
                 </SectionTitle>
                 <p className="text-[10px] text-gray-500 font-mono mb-4">
-                    Projection du solde dispo sur les 30 prochains jours — inclut prélèvements, abos récurrents et URSSAF du mois
+                    Projection du solde sur 90 jours — prélèvements, abos récurrents et URSSAF M+1 intégrés
                     {projectionMin < 0 && (
                         <span className="ml-2 text-red-400">⚠ point bas prévu : {fmt(projectionMin)} €</span>
                     )}
