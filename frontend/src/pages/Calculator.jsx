@@ -1,10 +1,11 @@
 import { useMemo, useState, useCallback } from "react";
-import { Cpu, TrendingUp, TrendingDown, Activity, Zap, Wrench, Calculator as CalcIcon } from "lucide-react";
+import { Cpu, TrendingUp, TrendingDown, Activity, Zap, Wrench, Calculator as CalcIcon, Wallet } from "lucide-react";
 import CalcForm from "@/components/CalcForm";
 import ResultPanel from "@/components/ResultPanel";
 import AssemblyForm from "@/components/AssemblyForm";
 import AssemblyResult from "@/components/AssemblyResult";
 import OneDrivePanel from "@/components/OneDrivePanel";
+import FinanceTab from "@/components/FinanceTab";
 
 export const TRAVEL_OPTIONS = [
     { key: "vauvert", label: "Vauvert", price: 10, hint: "Local" },
@@ -32,9 +33,16 @@ export const PORTABLE_COMPONENTS = [
     { key: "accessoires", label: "Accessoires (chargeur, sacoche…)", icon: "Box" },
 ];
 
-// URSSAF rates
-export const RATE_ARTICLE = 0.13;   // ventes d'articles
-export const RATE_PRESTATION = 0.23; // prestations de service
+// URSSAF rates exact (auto-entrepreneur micro BIC/BNC avec versement libératoire)
+export const RATE_URSSAF_PRESTA = 0.212;   // 21.2%
+export const RATE_URSSAF_VENTE = 0.123;    // 12.3%
+export const RATE_IMPOT_PRESTA = 0.017;    // 1.7% versement libératoire BIC presta
+export const RATE_IMPOT_VENTE = 0.01;      // 1.0% versement libératoire BIC vente
+export const RATE_FORMATION = 0.002;       // 0.2% CFP
+
+// Totaux combinés par catégorie
+export const RATE_ARTICLE = RATE_URSSAF_VENTE + RATE_IMPOT_VENTE + RATE_FORMATION;       // 13.5%
+export const RATE_PRESTATION = RATE_URSSAF_PRESTA + RATE_IMPOT_PRESTA + RATE_FORMATION;  // 23.1%
 
 const blankComponents = (list) =>
     Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "", sale: "" }]));
@@ -199,12 +207,12 @@ export default function Calculator() {
                                 <span className="text-yellow-500">zéro erreur.</span>
                             </h1>
                             <p className="mt-5 text-base text-gray-400 max-w-xl">
-                                Articles 13% · Prestations 23% — URSSAF calculée automatiquement
+                                Articles 13,5% · Prestations 23,1% — URSSAF calculée automatiquement
                                 selon la nature de chaque ligne.
                             </p>
                         </div>
 
-                        <div className="inline-flex border border-[#262626] bg-[#0d0d0d] p-1 w-fit">
+                        <div className="inline-flex border border-[#262626] bg-[#0d0d0d] p-1 w-fit flex-wrap">
                             <button
                                 data-testid="tab-quick"
                                 onClick={() => setMode("quick")}
@@ -229,13 +237,27 @@ export default function Calculator() {
                                 <Wrench className="h-3.5 w-3.5" />
                                 Assemblage PC
                             </button>
+                            <button
+                                data-testid="tab-finance"
+                                onClick={() => setMode("finance")}
+                                className={`flex items-center gap-2 px-5 py-3 text-xs tracking-[0.2em] uppercase font-mono transition-all ${
+                                    mode === "finance"
+                                        ? "bg-yellow-500 text-black"
+                                        : "text-gray-500 hover:text-white"
+                                }`}
+                            >
+                                <Wallet className="h-3.5 w-3.5" />
+                                Suivi Finance
+                            </button>
                         </div>
                     </div>
                 </div>
             </section>
 
             <section className="max-w-7xl mx-auto px-6 md:px-12 py-12 md:py-16">
-                {mode === "quick" ? (
+                {mode === "finance" ? (
+                    <FinanceTab />
+                ) : mode === "quick" ? (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-7">
                             <CalcForm
@@ -307,7 +329,7 @@ export default function Calculator() {
                 <div className="max-w-7xl mx-auto px-6 md:px-12 py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-mono text-[11px] tracking-[0.15em] uppercase text-gray-500">
                     <div className="flex items-center gap-2">
                         <Activity className="h-3 w-3" />
-                        <span>URSSAF · Articles 13% / Prestations 23%</span>
+                        <span>URSSAF · Articles 13,5% / Prestations 23,1%</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5">

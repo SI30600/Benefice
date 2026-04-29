@@ -1,0 +1,474 @@
+import { useEffect, useMemo, useState, useCallback } from "react";
+import axios from "axios";
+import {
+    Wallet, Plus, Trash2, Calendar, ArrowDownToLine, ArrowUpFromLine,
+    AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
+} from "lucide-react";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const fmt = (n) =>
+    new Intl.NumberFormat("fr-FR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(n || 0);
+
+const monthLabel = (yyyymm) => {
+    if (!yyyymm) return "";
+    const [y, m] = yyyymm.split("-");
+    const dt = new Date(Number(y), Number(m) - 1, 1);
+    return dt.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+};
+
+const SectionCard = ({ children, className = "" }) => (
+    <div className={`bg-[#111111] border border-[#262626] p-5 md:p-6 ${className}`}>
+        {children}
+    </div>
+);
+
+const SectionTitle = ({ icon: Icon, children, accent }) => (
+    <div className="flex items-center gap-2 mb-4">
+        {Icon && <Icon className={`h-3.5 w-3.5 ${accent || "text-yellow-500"}`} />}
+        <span className={`text-[10px] tracking-[0.3em] uppercase font-mono ${accent || "text-yellow-500"}`}>
+            {children}
+        </span>
+    </div>
+);
+
+const StatBox = ({ label, value, color = "text-white", testid, sub }) => (
+    <div data-testid={testid} className="border border-[#333333] bg-[#0d0d0d] p-3">
+        <div className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-500">
+            {label}
+        </div>
+        <div className={`font-mono text-xl font-bold mt-1 ${color}`}>
+            {typeof value === "number" ? `${fmt(value)} €` : value}
+        </div>
+        {sub && (
+            <div className="text-[10px] text-gray-500 font-mono mt-0.5">{sub}</div>
+        )}
+    </div>
+);
+
+export default function FinanceTab() {
+    const today = new Date().toISOString().slice(0, 10);
+    const [month, setMonth] = useState(today.slice(0, 7));
+    const [summary, setSummary] = useState(null);
+    const [entries, setEntries] = useState([]);
+    const [pending, setPending] = useState({ items: [], total: 0 });
+    const [balance, setBalance] = useState({ balance: 0, updated_at: "" });
+    const [loading, setLoading] = useState(true);
+
+    // Form states
+    const [entryForm, setEntryForm] = useState({
+        date: today,
+        category: "prestation",
+        amount: "",
+        description: "",
+        client_name: "",
+    });
+    const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "" });
+    const [balanceInput, setBalanceInput] = useState("");
+
+    const refresh = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [sumR, entR, penR, balR] = await Promise.all([
+                axios.get(`${API}/finance/summary?month=${month}`),
+                axios.get(`${API}/finance/entries?month=${month}`),
+                axios.get(`${API}/finance/pending`),
+                axios.get(`${API}/finance/balance`),
+            ]);
+            setSummary(sumR.data);
+            setEntries(entR.data);
+            setPending(penR.data);
+            setBalance(balR.data);
+            setBalanceInput(String(balR.data.balance ?? 0));
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }, [month]);
+
+    useEffect(() => { refresh(); }, [refresh]);
+
+    const addEntry = async () => {
+        if (!entryForm.amount || parseFloat(entryForm.amount) <= 0) return;
+        await axios.post(`${API}/finance/entries`, {
+            ...entryForm,
+            amount: parseFloat(entryForm.amount),
+        });
+        setEntryForm({ ...entryForm, amount: "", description: "", client_name: "" });
+        refresh();
+    };
+
+    const deleteEntry = async (id) => {
+        await axios.delete(`${API}/finance/entries/${id}`);
+        refresh();
+    };
+
+    const addPending = async () => {
+        if (!pendingForm.client_name || !pendingForm.amount) return;
+        await axios.post(`${API}/finance/pending`, {
+            ...pendingForm,
+            amount: parseFloat(pendingForm.amount),
+        });
+        setPendingForm({ client_name: "", amount: "", note: "" });
+        refresh();
+    };
+
+    const deletePending = async (id) => {
+        await axios.delete(`${API}/finance/pending/${id}`);
+        refresh();
+    };
+
+    const saveBalance = async () => {
+        await axios.put(`${API}/finance/balance`, {
+            balance: parseFloat(balanceInput) || 0,
+        });
+        refresh();
+    };
+
+    const cur = summary?.current;
+    const prev = summary?.previous;
+
+    const projected = useMemo(() => {
+        if (!cur) return 0;
+        const real = parseFloat(balanceInput) || 0;
+        return real + pending.total - cur.total_taxes;
+    }, [balanceInput, pending.total, cur]);
+
+    const CategoryPill = ({ value }) => {
+        const map = {
+            prestation: { label: "Prestation", color: "border-blue-500/50 text-blue-400" },
+            materiel: { label: "Matériel", color: "border-orange-500/50 text-orange-400" },
+            formation: { label: "Formation", color: "border-purple-500/50 text-purple-400" },
+        };
+        const conf = map[value] || { label: value, color: "border-gray-500 text-gray-400" };
+        return (
+            <span className={`text-[9px] font-mono tracking-[0.15em] uppercase px-1.5 py-0.5 border ${conf.color}`}>
+                {conf.label}
+            </span>
+        );
+    };
+
+    return (
+        <div data-testid="finance-tab" className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <span className="text-[10px] tracking-[0.3em] uppercase text-yellow-500 font-mono">
+                        // Suivi finance
+                    </span>
+                    <h2 className="text-3xl font-bold tracking-tight mt-1">
+                        {monthLabel(month) || "Mois en cours"}
+                    </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        data-testid="finance-month-picker"
+                        type="month"
+                        value={month}
+                        onChange={(e) => setMonth(e.target.value)}
+                        className="h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm font-mono focus:outline-none [color-scheme:dark]"
+                    />
+                    <button
+                        data-testid="finance-refresh"
+                        onClick={refresh}
+                        className="h-10 w-10 flex items-center justify-center border border-[#333333] hover:border-yellow-500 text-gray-400 hover:text-yellow-500 transition-colors"
+                    >
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </button>
+                </div>
+            </div>
+
+            {cur && (
+                <>
+                    {/* Big stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
+                        <StatBox label="Prestations" value={cur.presta} color="text-blue-400" testid="ca-presta" />
+                        <StatBox label="Matériel" value={cur.materiel} color="text-orange-400" testid="ca-materiel" />
+                        <StatBox label="Formation" value={cur.formation} color="text-purple-400" testid="ca-formation" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* URSSAF detail */}
+                        <SectionCard className="lg:col-span-2">
+                            <SectionTitle icon={Receipt}>Taxes du mois</SectionTitle>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+                                <StatBox label="URSSAF Presta 21,2%" value={cur.urssaf_presta} color="text-blue-400" testid="urssaf-presta" />
+                                <StatBox label="URSSAF Matériel 12,3%" value={cur.urssaf_materiel} color="text-orange-400" testid="urssaf-materiel" />
+                                <StatBox label="URSSAF Formation 21,2%" value={cur.urssaf_formation} color="text-purple-400" testid="urssaf-formation" />
+                                <StatBox label="Impôt Presta 1,7%" value={cur.impot_presta} color="text-blue-300" testid="impot-presta" />
+                                <StatBox label="Impôt Vente 1%" value={cur.impot_vente} color="text-orange-300" testid="impot-vente" />
+                                <StatBox label="CFP 0,2%" value={cur.cfp} color="text-yellow-400" testid="cfp" sub="sur tout le CA" />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-[#333333]">
+                                <StatBox label="URSSAF total" value={cur.total_urssaf} color="text-white" testid="total-urssaf" />
+                                <StatBox label="Impôt total" value={cur.total_impot} color="text-white" testid="total-impot" />
+                                <StatBox label="Total à payer" value={cur.total_taxes} color="text-red-400" testid="total-taxes" />
+                            </div>
+
+                            {prev && (
+                                <div className="mt-4 pt-4 border-t border-[#333333]">
+                                    <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 mb-2">
+                                        Comparaison · {monthLabel(summary.previous_month)}
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">CA précédent</div>
+                                            <div className="text-gray-200 mt-0.5">{fmt(prev.total_ca)} €</div>
+                                        </div>
+                                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">URSSAF préc.</div>
+                                            <div className="text-gray-200 mt-0.5">{fmt(prev.total_urssaf)} €</div>
+                                        </div>
+                                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                            <div className="text-gray-500 uppercase tracking-wider text-[9px]">Total taxes préc.</div>
+                                            <div className="text-red-300 mt-0.5">{fmt(prev.total_taxes)} €</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </SectionCard>
+
+                        {/* Account state */}
+                        <SectionCard>
+                            <SectionTitle icon={Wallet}>État du compte</SectionTitle>
+
+                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
+                                Solde réel sur le compte
+                            </label>
+                            <div className="flex gap-2 mt-1.5 mb-3">
+                                <input
+                                    data-testid="balance-input"
+                                    type="number"
+                                    step="0.01"
+                                    value={balanceInput}
+                                    onChange={(e) => setBalanceInput(e.target.value)}
+                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-lg font-mono font-bold focus:outline-none"
+                                />
+                                <button
+                                    data-testid="balance-save"
+                                    onClick={saveBalance}
+                                    className="px-3 bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-yellow-400"
+                                >
+                                    OK
+                                </button>
+                            </div>
+                            {balance.updated_at && (
+                                <p className="text-[10px] text-gray-500 font-mono mb-3">
+                                    Dernière maj : {new Date(balance.updated_at).toLocaleString("fr-FR")}
+                                </p>
+                            )}
+
+                            <div className="space-y-2 text-[12px] font-mono pt-3 border-t border-[#333333]">
+                                <div className="flex justify-between"><span className="text-gray-400">Solde réel</span><span className="text-white">{fmt(parseFloat(balanceInput) || 0)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
+                                <div className="flex justify-between pt-2 border-t border-[#333333]">
+                                    <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
+                                    <span className={`text-lg font-bold ${projected >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                        {fmt(projected)} €
+                                    </span>
+                                </div>
+                            </div>
+
+                            {cur.last_entry_date && (
+                                <p className="text-[10px] text-gray-500 font-mono mt-4 pt-3 border-t border-[#333333] flex items-center gap-1.5">
+                                    <Calendar className="h-3 w-3" />
+                                    Dernière saisie : {new Date(cur.last_entry_date).toLocaleDateString("fr-FR")}
+                                    {" · "}{cur.entries_count} entrée{cur.entries_count > 1 ? "s" : ""}
+                                </p>
+                            )}
+                        </SectionCard>
+                    </div>
+                </>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Add entry */}
+                <SectionCard>
+                    <SectionTitle icon={Plus}>Saisir une entrée</SectionTitle>
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                            <input
+                                data-testid="entry-date"
+                                type="date"
+                                value={entryForm.date}
+                                onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })}
+                                className="h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm font-mono focus:outline-none [color-scheme:dark]"
+                            />
+                            <select
+                                data-testid="entry-category"
+                                value={entryForm.category}
+                                onChange={(e) => setEntryForm({ ...entryForm, category: e.target.value })}
+                                className="h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                            >
+                                <option value="prestation">Prestation (21,2%)</option>
+                                <option value="materiel">Matériel (12,3%)</option>
+                                <option value="formation">Formation</option>
+                            </select>
+                        </div>
+
+                        <input
+                            data-testid="entry-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={entryForm.amount}
+                            onChange={(e) => setEntryForm({ ...entryForm, amount: e.target.value })}
+                            placeholder="Montant TTC en €"
+                            className="w-full h-12 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-2xl font-mono font-bold focus:outline-none"
+                        />
+
+                        <input
+                            data-testid="entry-client"
+                            type="text"
+                            value={entryForm.client_name}
+                            onChange={(e) => setEntryForm({ ...entryForm, client_name: e.target.value })}
+                            placeholder="Nom du client (optionnel)"
+                            className="w-full h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                        />
+                        <input
+                            data-testid="entry-description"
+                            type="text"
+                            value={entryForm.description}
+                            onChange={(e) => setEntryForm({ ...entryForm, description: e.target.value })}
+                            placeholder="Description / note (optionnel)"
+                            className="w-full h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                        />
+                        <button
+                            data-testid="entry-add"
+                            onClick={addEntry}
+                            className="w-full h-12 bg-yellow-500 text-black text-xs tracking-[0.2em] uppercase font-mono font-semibold hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Ajouter au mois
+                        </button>
+                    </div>
+                </SectionCard>
+
+                {/* Pending payments */}
+                <SectionCard>
+                    <SectionTitle icon={Coins} accent="text-green-400">
+                        Paiements en attente · {fmt(pending.total)} €
+                    </SectionTitle>
+
+                    <div className="grid grid-cols-12 gap-2 mb-3">
+                        <input
+                            data-testid="pending-client"
+                            type="text"
+                            value={pendingForm.client_name}
+                            onChange={(e) => setPendingForm({ ...pendingForm, client_name: e.target.value })}
+                            placeholder="Nom client"
+                            className="col-span-5 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                        />
+                        <input
+                            data-testid="pending-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={pendingForm.amount}
+                            onChange={(e) => setPendingForm({ ...pendingForm, amount: e.target.value })}
+                            placeholder="Montant €"
+                            className="col-span-4 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-green-400 text-sm font-mono font-bold focus:outline-none"
+                        />
+                        <button
+                            data-testid="pending-add"
+                            onClick={addPending}
+                            className="col-span-3 h-11 bg-green-600 hover:bg-green-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Ajouter
+                        </button>
+                    </div>
+
+                    {pending.items.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
+                            Aucun paiement en attente
+                        </p>
+                    ) : (
+                        <div className="space-y-1 max-h-72 overflow-y-auto">
+                            {pending.items.map((p) => (
+                                <div
+                                    key={p.id}
+                                    data-testid={`pending-item-${p.id}`}
+                                    className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                >
+                                    <div className="flex flex-col min-w-0 flex-1">
+                                        <span className="text-sm text-white truncate">{p.client_name}</span>
+                                        {p.note && (
+                                            <span className="text-[10px] text-gray-500 truncate">{p.note}</span>
+                                        )}
+                                    </div>
+                                    <span className="font-mono text-sm font-bold text-green-400 shrink-0">
+                                        {fmt(p.amount)} €
+                                    </span>
+                                    <button
+                                        data-testid={`pending-delete-${p.id}`}
+                                        onClick={() => deletePending(p.id)}
+                                        className="text-gray-500 hover:text-red-500 transition-colors"
+                                        aria-label="Supprimer"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </SectionCard>
+            </div>
+
+            {/* Entries list */}
+            <SectionCard>
+                <SectionTitle icon={FileText}>
+                    Saisies du mois · {entries.length} ligne{entries.length > 1 ? "s" : ""}
+                </SectionTitle>
+                {entries.length === 0 ? (
+                    <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed flex items-center justify-center gap-2">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        Aucune entrée pour ce mois
+                    </p>
+                ) : (
+                    <div className="space-y-1 max-h-96 overflow-y-auto">
+                        {entries.map((e) => (
+                            <div
+                                key={e.id}
+                                data-testid={`entry-item-${e.id}`}
+                                className="grid grid-cols-12 gap-2 items-center px-3 py-2 bg-[#0d0d0d] border border-[#222222] hover:border-[#444444]"
+                            >
+                                <span className="col-span-2 text-[11px] font-mono text-gray-400">{e.date}</span>
+                                <span className="col-span-2"><CategoryPill value={e.category} /></span>
+                                <div className="col-span-5 min-w-0">
+                                    <div className="text-sm text-white truncate">
+                                        {e.client_name || e.description || "—"}
+                                    </div>
+                                    {e.client_name && e.description && (
+                                        <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
+                                    )}
+                                    {e.source === "devis" && (
+                                        <span className="text-[9px] text-yellow-500 font-mono uppercase tracking-wider">[auto]</span>
+                                    )}
+                                </div>
+                                <span className="col-span-2 font-mono text-sm font-bold text-yellow-500 text-right">
+                                    {fmt(e.amount)} €
+                                </span>
+                                <button
+                                    data-testid={`entry-delete-${e.id}`}
+                                    onClick={() => deleteEntry(e.id)}
+                                    className="col-span-1 text-gray-500 hover:text-red-500 transition-colors flex justify-center"
+                                    aria-label="Supprimer"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </SectionCard>
+        </div>
+    );
+}

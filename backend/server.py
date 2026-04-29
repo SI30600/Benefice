@@ -15,6 +15,10 @@ from onedrive import (
     build_auth_url, exchange_code_for_token, refresh_access_token,
     get_user_profile, append_devis_row, gen_state, now_iso,
 )
+from finance import (
+    FinanceEntry, FinanceEntryCreate, PendingPayment, PendingPaymentCreate,
+    AccountBalance, compute_summary, CATEGORIES,
+)
 
 
 ROOT_DIR = Path(__file__).parent
@@ -228,12 +232,144 @@ async def save_devis(payload: DevisPayload = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur OneDrive: {e}") from e
 
+    # Auto-feed Finance ledger : create entries from this devis
+    materiel_amount = round(float(payload.partsSale or 0) + float(payload.licenseFee or 0), 2)
+    presta_amount = round(float(payload.serviceFee or 0) + float(payload.travelAmount or 0), 2)
+    auto_entries = []
+    if materiel_amount > 0:
+        auto_entries.append({
+            "id": str(uuid.uuid4()),
+            "date": payload.date or datetime.now(timezone.utc).date().isoformat(),
+            "category": "materiel",
+            "amount": materiel_amount,
+            "description": f"Devis {payload.clientName} — pièces + Windows",
+            "client_name": payload.clientName,
+            "source": "devis",
+            "created_at": now_iso(),
+        })
+    if presta_amount > 0:
+        auto_entries.append({
+            "id": str(uuid.uuid4()),
+            "date": payload.date or datetime.now(timezone.utc).date().isoformat(),
+            "category": "prestation",
+            "amount": presta_amount,
+            "description": f"Devis {payload.clientName} — {payload.serviceLabel or 'service'}",
+            "client_name": payload.clientName,
+            "source": "devis",
+            "created_at": now_iso(),
+        })
+    if auto_entries:
+        await db.finance_entries.insert_many(auto_entries)
+
     return {
         "success": True,
         "file_path": file_path,
         "user_email": user_email,
         "web_url": result.get("webUrl"),
+        "auto_finance_entries": len(auto_entries),
     }
+
+
+# ---- Finance: entries -------------------------------------------------------
+
+@api_router.post("/finance/entries", response_model=FinanceEntry)
+async def create_finance_entry(payload: FinanceEntryCreate):
+    if payload.category not in CATEGORIES:
+        raise HTTPException(status_code=400, detail="Catégorie invalide")
+    entry = FinanceEntry(**payload.model_dump())
+    await db.finance_entries.insert_one(entry.model_dump())
+    return entry
+
+
+@api_router.get("/finance/entries")
+async def list_finance_entries(month: Optional[str] = None):
+    """List entries; optional `month` filter as YYYY-MM."""
+    query: Dict[str, Any] = {}
+    if month:
+        query["date"] = {"$regex": f"^{month}-"}
+    rows = await db.finance_entries.find(query, {"_id": 0}).sort("date", -1).to_list(2000)
+    return rows
+
+
+@api_router.delete("/finance/entries/{entry_id}")
+async def delete_finance_entry(entry_id: str):
+    res = await db.finance_entries.delete_one({"id": entry_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entrée introuvable")
+    return {"deleted": True}
+
+
+@api_router.get("/finance/summary")
+async def get_finance_summary(month: Optional[str] = None):
+    """Summary of a month (default current). Returns current + previous month."""
+    today = datetime.now(timezone.utc).date()
+    if not month:
+        month = today.strftime("%Y-%m")
+
+    y, m = map(int, month.split("-"))
+    prev_y, prev_m = (y - 1, 12) if m == 1 else (y, m - 1)
+    prev_month = f"{prev_y:04d}-{prev_m:02d}"
+
+    cur_rows = await db.finance_entries.find(
+        {"date": {"$regex": f"^{month}-"}}, {"_id": 0}
+    ).to_list(2000)
+    prev_rows = await db.finance_entries.find(
+        {"date": {"$regex": f"^{prev_month}-"}}, {"_id": 0}
+    ).to_list(2000)
+
+    return {
+        "month": month,
+        "previous_month": prev_month,
+        "current": compute_summary(cur_rows),
+        "previous": compute_summary(prev_rows),
+    }
+
+
+# ---- Finance: pending payments ----------------------------------------------
+
+@api_router.post("/finance/pending", response_model=PendingPayment)
+async def create_pending_payment(payload: PendingPaymentCreate):
+    pp = PendingPayment(**payload.model_dump())
+    await db.pending_payments.insert_one(pp.model_dump())
+    return pp
+
+
+@api_router.get("/finance/pending")
+async def list_pending_payments():
+    rows = await db.pending_payments.find({"paid": False}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    total = round(sum(r.get("amount", 0) for r in rows), 2)
+    return {"items": rows, "total": total, "count": len(rows)}
+
+
+@api_router.delete("/finance/pending/{payment_id}")
+async def delete_pending_payment(payment_id: str):
+    res = await db.pending_payments.delete_one({"id": payment_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
+    return {"deleted": True}
+
+
+# ---- Finance: account balance ----------------------------------------------
+
+BALANCE_DOC_ID = "default"
+
+
+@api_router.get("/finance/balance")
+async def get_balance():
+    doc = await db.account_balance.find_one({"_id": BALANCE_DOC_ID}, {"_id": 0})
+    if not doc:
+        return {"balance": 0, "updated_at": ""}
+    return doc
+
+
+@api_router.put("/finance/balance")
+async def set_balance(body: AccountBalance):
+    update = body.model_dump()
+    update["updated_at"] = now_iso()
+    await db.account_balance.update_one(
+        {"_id": BALANCE_DOC_ID}, {"$set": update}, upsert=True
+    )
+    return update
 
 
 # ---- App wiring -------------------------------------------------------------
