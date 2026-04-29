@@ -5,10 +5,43 @@ import ResultPanel from "@/components/ResultPanel";
 import AssemblyForm from "@/components/AssemblyForm";
 import AssemblyResult from "@/components/AssemblyResult";
 
-export default function Calculator() {
-    const [mode, setMode] = useState("quick"); // "quick" | "assembly"
+export const TRAVEL_OPTIONS = [
+    { key: "vauvert", label: "Vauvert", price: 10, hint: "Local" },
+    { key: "zone15", label: "≤ 15 km", price: 20, hint: "Proche" },
+    { key: "zone40", label: "15 – 40 km", price: 40, hint: "Moyen" },
+    { key: "zone100", label: "40 – 100 km", price: 80, hint: "Loin" },
+    { key: "mondial", label: "Mondial Relay", price: 25, hint: "Assurance incluse" },
+    { key: "none", label: "Aucun — Atelier", price: 0, hint: "Sur place" },
+];
 
-    // Quick calculator state
+export const FIXE_COMPONENTS = [
+    { key: "carteMere", label: "Carte mère", icon: "Cpu" },
+    { key: "processeur", label: "Processeur", icon: "Cpu" },
+    { key: "carteGraphique", label: "Carte graphique", icon: "Monitor" },
+    { key: "memoire", label: "Mémoire (RAM)", icon: "MemoryStick" },
+    { key: "disqueDur", label: "Disque dur / SSD", icon: "HardDrive" },
+    { key: "alimentation", label: "Alimentation", icon: "Plug" },
+    { key: "boitier", label: "Boîtier", icon: "Box" },
+    { key: "clavierSouris", label: "Clavier-souris", icon: "Keyboard" },
+    { key: "ecran", label: "Écran", icon: "Monitor" },
+];
+
+export const PORTABLE_COMPONENTS = [
+    { key: "modele", label: "Modèle / référence", icon: "Laptop" },
+    { key: "accessoires", label: "Accessoires (chargeur, sacoche…)", icon: "Box" },
+];
+
+// URSSAF rates
+export const RATE_ARTICLE = 0.13;   // ventes d'articles
+export const RATE_PRESTATION = 0.23; // prestations de service
+
+const blankComponents = (list) =>
+    Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "" }]));
+
+export default function Calculator() {
+    const [mode, setMode] = useState("quick");
+
+    // Quick calculator (articles → 13%)
     const [values, setValues] = useState({
         itemName: "",
         date: new Date().toISOString().slice(0, 10),
@@ -23,7 +56,7 @@ export default function Calculator() {
         const sale = parseFloat(values.salePrice) || 0;
         const delivery = parseFloat(values.delivery) || 0;
         const lbcTax = +(purchase * 0.05).toFixed(2);
-        const urssaf = +(sale * 0.13).toFixed(2);
+        const urssaf = +(sale * RATE_ARTICLE).toFixed(2);
         const totalCosts = +(purchase + lbcTax + delivery + urssaf).toFixed(2);
         const grossProfit = +(sale - purchase).toFixed(2);
         const netProfit = +(sale - totalCosts).toFixed(2);
@@ -39,42 +72,76 @@ export default function Calculator() {
     // Assembly state
     const [asm, setAsm] = useState({
         clientName: "",
+        clientAddress: "",
+        clientPostal: "",
+        clientCity: "",
+        clientPhone: "",
+        clientEmail: "",
         date: new Date().toISOString().slice(0, 10),
         machineType: "fixe",
-        partsCost: "",
+        componentsFixe: blankComponents(FIXE_COMPONENTS),
+        componentsPortable: blankComponents(PORTABLE_COMPONENTS),
         partsSale: "",
-        baseService: true, // 100€ always
-        dataRecovery: false, // 50€
+        // Articles (13%)
+        licenseWindows: true,
+        amountLicense: "30",
+        // Prestations (23%)
+        premierDemarrage: true,
+        amountDemarrage: "70",
+        dataRecovery: false,
+        amountData: "50",
         travelZone: "vauvert",
     });
 
-    const TRAVEL = {
-        vauvert: { label: "Vauvert", price: 10 },
-        zone15: { label: "≤ 15 km", price: 20 },
-        zone40: { label: "15 – 40 km", price: 40 },
-        zone100: { label: "40 – 100 km", price: 80 },
-        none: { label: "Aucun (sur place)", price: 0 },
-    };
-
     const asmCalc = useMemo(() => {
-        const partsCost = parseFloat(asm.partsCost) || 0;
-        const partsSale = parseFloat(asm.partsSale) || 0;
-        const lbcTax = +(partsCost * 0.05).toFixed(2);
-        const baseFee = asm.baseService ? 100 : 0;
-        const dataFee = asm.dataRecovery ? 50 : 0;
-        const travel = TRAVEL[asm.travelZone]?.price || 0;
+        const components =
+            asm.machineType === "fixe" ? asm.componentsFixe : asm.componentsPortable;
+        const compList =
+            asm.machineType === "fixe" ? FIXE_COMPONENTS : PORTABLE_COMPONENTS;
 
-        const totalBilled = +(partsSale + baseFee + dataFee + travel).toFixed(2);
-        const urssaf = +(totalBilled * 0.13).toFixed(2);
+        const partsCost = +compList
+            .reduce((sum, c) => sum + (parseFloat(components[c.key]?.cost) || 0), 0)
+            .toFixed(2);
+
+        const partsSale = parseFloat(asm.partsSale) || 0;
+        const licenseFee = asm.licenseWindows ? parseFloat(asm.amountLicense) || 0 : 0;
+        const demarrageFee = asm.premierDemarrage ? parseFloat(asm.amountDemarrage) || 0 : 0;
+        const dataFee = asm.dataRecovery ? parseFloat(asm.amountData) || 0 : 0;
+
+        const travelObj = TRAVEL_OPTIONS.find((t) => t.key === asm.travelZone);
+        const travel = travelObj?.price || 0;
+
+        // Articles bucket (13%)
+        const articlesTotal = +(partsSale + licenseFee).toFixed(2);
+        // Prestations bucket (23%) — incl. travel/déplacement
+        const prestationsTotal = +(demarrageFee + dataFee + travel).toFixed(2);
+
+        const lbcTax = +(partsCost * 0.05).toFixed(2);
+        const urssafArticles = +(articlesTotal * RATE_ARTICLE).toFixed(2);
+        const urssafPrestations = +(prestationsTotal * RATE_PRESTATION).toFixed(2);
+        const urssaf = +(urssafArticles + urssafPrestations).toFixed(2);
+
+        const totalBilled = +(articlesTotal + prestationsTotal).toFixed(2);
         const totalCosts = +(partsCost + lbcTax + urssaf).toFixed(2);
         const netProfit = +(totalBilled - totalCosts).toFixed(2);
         const margin = totalBilled > 0 ? +((netProfit / totalBilled) * 100).toFixed(1) : 0;
 
         return {
-            partsCost, partsSale, lbcTax, baseFee, dataFee, travel,
-            travelLabel: TRAVEL[asm.travelZone]?.label,
-            totalBilled, urssaf, totalCosts, netProfit, margin,
+            partsCost, partsSale, lbcTax,
+            licenseFee, demarrageFee, dataFee, travel,
+            travelLabel: travelObj?.label,
+            articlesTotal, prestationsTotal,
+            urssafArticles, urssafPrestations, urssaf,
+            totalBilled, totalCosts, netProfit, margin,
             hasData: totalBilled > 0,
+            componentsBreakdown: compList
+                .map((c) => ({
+                    key: c.key,
+                    label: c.label,
+                    name: components[c.key]?.name || "",
+                    cost: parseFloat(components[c.key]?.cost) || 0,
+                }))
+                .filter((c) => c.cost > 0 || c.name),
         };
     }, [asm]);
 
@@ -91,7 +158,7 @@ export default function Calculator() {
                                 Reseller Terminal
                             </span>
                             <span className="text-sm font-semibold tracking-tight">
-                                BÉNÉFICE.NET<span className="text-yellow-500">/</span>v2
+                                BÉNÉFICE.NET<span className="text-yellow-500">/</span>v4
                             </span>
                         </div>
                     </div>
@@ -105,7 +172,6 @@ export default function Calculator() {
                 </div>
             </header>
 
-            {/* Mode switcher */}
             <section className="border-b border-[#262626] bg-[#111111]">
                 <div className="max-w-7xl mx-auto px-6 md:px-12 py-10 md:py-14">
                     <div className="flex flex-col gap-8">
@@ -118,12 +184,11 @@ export default function Calculator() {
                                 <span className="text-yellow-500">zéro erreur.</span>
                             </h1>
                             <p className="mt-5 text-base text-gray-400 max-w-xl">
-                                Revente de pièces ou prestation d'assemblage — choisis ton mode et
-                                obtiens ton bénéfice net en temps réel.
+                                Articles 13% · Prestations 23% — URSSAF calculée automatiquement
+                                selon la nature de chaque ligne.
                             </p>
                         </div>
 
-                        {/* Mode tabs */}
                         <div className="inline-flex border border-[#262626] bg-[#0d0d0d] p-1 w-fit">
                             <button
                                 data-testid="tab-quick"
@@ -167,7 +232,14 @@ export default function Calculator() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-7">
-                            <AssemblyForm asm={asm} setAsm={setAsm} TRAVEL={TRAVEL} />
+                            <AssemblyForm
+                                asm={asm}
+                                setAsm={setAsm}
+                                travelOptions={TRAVEL_OPTIONS}
+                                fixeComponents={FIXE_COMPONENTS}
+                                portableComponents={PORTABLE_COMPONENTS}
+                                partsCost={asmCalc.partsCost}
+                            />
                         </div>
                         <div className="lg:col-span-5 lg:sticky lg:top-8">
                             <AssemblyResult calc={asmCalc} clientName={asm.clientName} />
@@ -180,7 +252,7 @@ export default function Calculator() {
                 <div className="max-w-7xl mx-auto px-6 md:px-12 py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-mono text-[11px] tracking-[0.15em] uppercase text-gray-500">
                     <div className="flex items-center gap-2">
                         <Activity className="h-3 w-3" />
-                        <span>Calcul instantané — aucune donnée n'est sauvegardée</span>
+                        <span>URSSAF · Articles 13% / Prestations 23%</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5">

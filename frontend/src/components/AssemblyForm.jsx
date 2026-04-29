@@ -1,11 +1,11 @@
-import { User, Calendar as CalendarIcon, Monitor, Laptop, ArrowDownToLine, ArrowUpFromLine, MapPin, Wrench, HardDrive } from "lucide-react";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+    User, Calendar as CalendarIcon, Monitor, Laptop, ArrowUpFromLine,
+    MapPin, Wrench, HardDrive, Phone, Mail, Home, Cpu, MemoryStick, Plug, Box, Keyboard, Package, KeyRound,
+} from "lucide-react";
+
+const ICON_MAP = {
+    Cpu, Monitor, MemoryStick, HardDrive, Plug, Box, Keyboard, Laptop,
+};
 
 const FieldLabel = ({ children, icon: Icon }) => (
     <label className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.2em] uppercase text-gray-400">
@@ -35,8 +35,146 @@ const Toggle = ({ active, onClick, children, testid }) => (
     </button>
 );
 
-export default function AssemblyForm({ asm, setAsm, TRAVEL }) {
+const ComponentRow = ({ label, icon: Icon, value, onChange, testid }) => (
+    <div className="grid grid-cols-12 gap-2 items-center">
+        <div className="col-span-5 flex items-center gap-2 min-w-0 px-1">
+            {Icon && <Icon className="h-3.5 w-3.5 text-gray-500 shrink-0" />}
+            <span className="text-xs text-gray-300 truncate">{label}</span>
+        </div>
+        <div className="col-span-4">
+            <InputBox>
+                <input
+                    data-testid={`${testid}-name`}
+                    type="text"
+                    value={value.name}
+                    onChange={(e) => onChange({ ...value, name: e.target.value })}
+                    placeholder="Modèle / référence"
+                    className="w-full h-10 px-3 bg-transparent text-white text-xs focus:outline-none placeholder:text-gray-600"
+                />
+            </InputBox>
+        </div>
+        <div className="col-span-3">
+            <InputBox>
+                <input
+                    data-testid={`${testid}-cost`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={value.cost}
+                    onChange={(e) => onChange({ ...value, cost: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full h-10 px-3 pr-7 bg-transparent text-white text-sm font-mono focus:outline-none placeholder:text-gray-700"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs">€</span>
+            </InputBox>
+        </div>
+    </div>
+);
+
+const TravelButton = ({ option, active, onClick }) => (
+    <button
+        data-testid={`asm-travel-${option.key}`}
+        type="button"
+        onClick={onClick}
+        className={`flex flex-col items-start text-left p-3 border transition-all ${
+            active
+                ? "border-yellow-500 bg-yellow-500/10"
+                : "border-[#333333] bg-[#0d0d0d] hover:border-yellow-500/50"
+        }`}
+    >
+        <span className="flex items-center justify-between w-full mb-1">
+            <span className={`text-[11px] tracking-wider font-mono uppercase ${active ? "text-yellow-500" : "text-gray-300"}`}>
+                {option.label}
+            </span>
+            <span className={`text-sm font-mono font-bold ${active ? "text-yellow-500" : "text-white"}`}>
+                {option.price}€
+            </span>
+        </span>
+        <span className="text-[10px] text-gray-500 font-mono">{option.hint}</span>
+    </button>
+);
+
+const ServiceCard = ({
+    active, onToggle, testid, icon: Icon, title, description,
+    amount, onAmountChange, badge, badgeColor,
+}) => (
+    <div
+        className={`w-full border transition-all ${
+            active
+                ? "border-yellow-500 bg-yellow-500/5"
+                : "border-[#333333] bg-[#0d0d0d]"
+        }`}
+    >
+        <div className="flex items-start gap-4 p-5">
+            <button
+                data-testid={testid}
+                type="button"
+                onClick={onToggle}
+                className={`mt-0.5 h-5 w-5 flex items-center justify-center shrink-0 border ${
+                    active
+                        ? "bg-yellow-500 border-yellow-500"
+                        : "border-[#333333] hover:border-yellow-500/50"
+                }`}
+                aria-label="Activer/désactiver"
+            >
+                {active && (
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-black" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                )}
+            </button>
+
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <Icon className="h-3.5 w-3.5 text-yellow-500" />
+                        <span className="text-sm font-semibold text-white">
+                            {title}
+                        </span>
+                        <span
+                            className={`text-[9px] font-mono tracking-[0.15em] uppercase px-1.5 py-0.5 border ${badgeColor}`}
+                        >
+                            {badge}
+                        </span>
+                    </div>
+                    <div className={`flex items-center gap-1 ${active ? "" : "opacity-50"}`}>
+                        <input
+                            data-testid={`${testid}-amount`}
+                            type="number"
+                            inputMode="decimal"
+                            step="1"
+                            min="0"
+                            value={amount}
+                            onChange={onAmountChange}
+                            disabled={!active}
+                            className="w-16 h-8 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-base font-mono font-semibold text-right px-2 focus:outline-none disabled:cursor-not-allowed"
+                        />
+                        <span className="font-mono text-base font-semibold text-yellow-500">€</span>
+                    </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                    {description}
+                </p>
+            </div>
+        </div>
+    </div>
+);
+
+export default function AssemblyForm({
+    asm, setAsm, travelOptions, fixeComponents, portableComponents, partsCost,
+}) {
     const update = (key) => (e) => setAsm((s) => ({ ...s, [key]: e.target.value }));
+    const isFixe = asm.machineType === "fixe";
+    const components = isFixe ? fixeComponents : portableComponents;
+    const componentsKey = isFixe ? "componentsFixe" : "componentsPortable";
+
+    const updateComponent = (key, val) => {
+        setAsm((s) => ({
+            ...s,
+            [componentsKey]: { ...s[componentsKey], [key]: val },
+        }));
+    };
 
     return (
         <section
@@ -61,7 +199,7 @@ export default function AssemblyForm({ asm, setAsm, TRAVEL }) {
             </div>
 
             <div className="space-y-6">
-                {/* Client + Date */}
+                {/* Client */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <FieldLabel icon={User}>Nom du client</FieldLabel>
@@ -85,6 +223,79 @@ export default function AssemblyForm({ asm, setAsm, TRAVEL }) {
                                 value={asm.date}
                                 onChange={update("date")}
                                 className="w-full h-12 px-4 bg-transparent text-white text-sm font-mono focus:outline-none [color-scheme:dark]"
+                            />
+                        </InputBox>
+                    </div>
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2">
+                    <FieldLabel icon={Home}>Adresse</FieldLabel>
+                    <InputBox>
+                        <input
+                            data-testid="asm-input-address"
+                            type="text"
+                            value={asm.clientAddress}
+                            onChange={update("clientAddress")}
+                            placeholder="N° + nom de rue"
+                            className="w-full h-12 px-4 bg-transparent text-white text-sm focus:outline-none placeholder:text-gray-600"
+                        />
+                    </InputBox>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <FieldLabel>Code postal</FieldLabel>
+                        <InputBox>
+                            <input
+                                data-testid="asm-input-postal"
+                                type="text"
+                                value={asm.clientPostal}
+                                onChange={update("clientPostal")}
+                                placeholder="30600"
+                                className="w-full h-12 px-4 bg-transparent text-white text-sm font-mono focus:outline-none placeholder:text-gray-600"
+                            />
+                        </InputBox>
+                    </div>
+                    <div className="space-y-2 col-span-1 sm:col-span-2">
+                        <FieldLabel>Ville</FieldLabel>
+                        <InputBox>
+                            <input
+                                data-testid="asm-input-city"
+                                type="text"
+                                value={asm.clientCity}
+                                onChange={update("clientCity")}
+                                placeholder="Vauvert"
+                                className="w-full h-12 px-4 bg-transparent text-white text-sm focus:outline-none placeholder:text-gray-600"
+                            />
+                        </InputBox>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <FieldLabel icon={Phone}>Téléphone</FieldLabel>
+                        <InputBox>
+                            <input
+                                data-testid="asm-input-phone"
+                                type="tel"
+                                value={asm.clientPhone}
+                                onChange={update("clientPhone")}
+                                placeholder="06 12 34 56 78"
+                                className="w-full h-12 px-4 bg-transparent text-white text-sm font-mono focus:outline-none placeholder:text-gray-600"
+                            />
+                        </InputBox>
+                    </div>
+                    <div className="space-y-2">
+                        <FieldLabel icon={Mail}>Email</FieldLabel>
+                        <InputBox>
+                            <input
+                                data-testid="asm-input-email"
+                                type="email"
+                                value={asm.clientEmail}
+                                onChange={update("clientEmail")}
+                                placeholder="client@email.fr"
+                                className="w-full h-12 px-4 bg-transparent text-white text-sm focus:outline-none placeholder:text-gray-600"
                             />
                         </InputBox>
                     </div>
@@ -115,193 +326,159 @@ export default function AssemblyForm({ asm, setAsm, TRAVEL }) {
 
                 <div className="flex items-center gap-3 py-2">
                     <div className="h-px flex-1 bg-[#262626]" />
-                    <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-gray-600">
-                        Pièces
+                    <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-gray-600 flex items-center gap-2">
+                        <Package className="h-3 w-3" />
+                        Composants {isFixe ? "PC fixe" : "portable"}
                     </span>
                     <div className="h-px flex-1 bg-[#262626]" />
                 </div>
 
-                {/* Parts cost + sale */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <FieldLabel icon={ArrowDownToLine}>Coût pièces (achat)</FieldLabel>
-                        <InputBox>
-                            <input
-                                data-testid="asm-input-parts-cost"
-                                type="number"
-                                inputMode="decimal"
-                                step="0.01"
-                                min="0"
-                                value={asm.partsCost}
-                                onChange={update("partsCost")}
-                                placeholder="0.00"
-                                className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
-                        </InputBox>
-                        <p className="text-[11px] text-gray-500 font-mono">Taxe LBC 5% appliquée</p>
-                    </div>
-                    <div className="space-y-2">
-                        <FieldLabel icon={ArrowUpFromLine}>Pièces facturées au client</FieldLabel>
-                        <InputBox>
-                            <input
-                                data-testid="asm-input-parts-sale"
-                                type="number"
-                                inputMode="decimal"
-                                step="0.01"
-                                min="0"
-                                value={asm.partsSale}
-                                onChange={update("partsSale")}
-                                placeholder="0.00"
-                                className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
-                        </InputBox>
-                        <p className="text-[11px] text-gray-500 font-mono">0 si client fournit ses pièces</p>
-                    </div>
+                <div className="grid grid-cols-12 gap-2 px-1 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-600">
+                    <div className="col-span-5">Composant</div>
+                    <div className="col-span-4">Modèle</div>
+                    <div className="col-span-3">Coût (achat)</div>
+                </div>
+
+                <div className="space-y-2">
+                    {components.map((c) => (
+                        <ComponentRow
+                            key={c.key}
+                            label={c.label}
+                            icon={ICON_MAP[c.icon]}
+                            value={asm[componentsKey][c.key] || { name: "", cost: "" }}
+                            onChange={(val) => updateComponent(c.key, val)}
+                            testid={`asm-comp-${c.key}`}
+                        />
+                    ))}
+                </div>
+
+                <div className="flex items-center justify-between bg-[#0d0d0d] border border-[#333333] px-4 py-3">
+                    <span className="text-[11px] tracking-[0.2em] uppercase font-mono text-gray-400">
+                        Total coût pièces (auto)
+                    </span>
+                    <span
+                        data-testid="asm-parts-cost-total"
+                        className="font-mono text-lg font-bold text-yellow-500"
+                    >
+                        {partsCost.toFixed(2)} €
+                    </span>
+                </div>
+
+                <div className="space-y-2">
+                    <FieldLabel icon={ArrowUpFromLine}>Pièces facturées au client</FieldLabel>
+                    <InputBox>
+                        <input
+                            data-testid="asm-input-parts-sale"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={asm.partsSale}
+                            onChange={update("partsSale")}
+                            placeholder="0.00"
+                            className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
+                    </InputBox>
+                    <p className="text-[11px] text-gray-500 font-mono">
+                        Pièces facturées (article — URSSAF 13%). Mets 0 si client fournit ses pièces.
+                    </p>
                 </div>
 
                 <div className="flex items-center gap-3 py-2">
                     <div className="h-px flex-1 bg-[#262626]" />
                     <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-gray-600">
-                        Services
+                        Articles & prestations
                     </span>
                     <div className="h-px flex-1 bg-[#262626]" />
                 </div>
 
-                {/* Service base */}
-                <button
-                    data-testid="asm-service-base"
-                    type="button"
-                    onClick={() => setAsm((s) => ({ ...s, baseService: !s.baseService }))}
-                    className={`w-full flex items-start gap-4 p-5 border text-left transition-all ${
-                        asm.baseService
-                            ? "border-yellow-500 bg-yellow-500/5"
-                            : "border-[#333333] bg-[#0d0d0d] hover:border-yellow-500/50"
-                    }`}
-                >
-                    <div
-                        className={`mt-0.5 h-5 w-5 flex items-center justify-center shrink-0 border ${
-                            asm.baseService
-                                ? "bg-yellow-500 border-yellow-500"
-                                : "border-[#333333]"
-                        }`}
-                    >
-                        {asm.baseService && (
-                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-black" fill="none" stroke="currentColor" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <Wrench className="h-3.5 w-3.5 text-yellow-500" />
-                                <span className="text-sm font-semibold text-white">
-                                    Premier démarrage + Licence Windows
-                                </span>
-                            </div>
-                            <span className="font-mono text-base font-semibold text-yellow-500">
-                                +100 €
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
-                            Installation Windows, configuration initiale, mise en service.
-                        </p>
-                    </div>
-                </button>
+                {/* Licence Windows — ARTICLE 13% */}
+                <ServiceCard
+                    testid="asm-license"
+                    active={asm.licenseWindows}
+                    onToggle={() => setAsm((s) => ({ ...s, licenseWindows: !s.licenseWindows }))}
+                    icon={KeyRound}
+                    title="Licence Windows"
+                    description="Vente de la licence Windows (article — URSSAF 13%)."
+                    amount={asm.amountLicense}
+                    onAmountChange={update("amountLicense")}
+                    badge="ART · 13%"
+                    badgeColor="border-orange-500/50 text-orange-400"
+                />
 
-                {/* Data recovery */}
-                <button
-                    data-testid="asm-service-data"
-                    type="button"
-                    onClick={() => setAsm((s) => ({ ...s, dataRecovery: !s.dataRecovery }))}
-                    className={`w-full flex items-start gap-4 p-5 border text-left transition-all ${
-                        asm.dataRecovery
-                            ? "border-yellow-500 bg-yellow-500/5"
-                            : "border-[#333333] bg-[#0d0d0d] hover:border-yellow-500/50"
-                    }`}
-                >
-                    <div
-                        className={`mt-0.5 h-5 w-5 flex items-center justify-center shrink-0 border ${
-                            asm.dataRecovery
-                                ? "bg-yellow-500 border-yellow-500"
-                                : "border-[#333333]"
-                        }`}
-                    >
-                        {asm.dataRecovery && (
-                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-black" fill="none" stroke="currentColor" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <HardDrive className="h-3.5 w-3.5 text-yellow-500" />
-                                <span className="text-sm font-semibold text-white">
-                                    Récupération des données (ancien PC)
-                                </span>
-                            </div>
-                            <span className="font-mono text-base font-semibold text-yellow-500">
-                                +50 €
-                            </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
-                            Transfert des données de l'ancien ordinateur vers le nouveau.
-                        </p>
-                    </div>
-                </button>
+                {/* Premier démarrage — PRESTATION 23% */}
+                <ServiceCard
+                    testid="asm-demarrage"
+                    active={asm.premierDemarrage}
+                    onToggle={() => setAsm((s) => ({ ...s, premierDemarrage: !s.premierDemarrage }))}
+                    icon={Wrench}
+                    title="Premier démarrage"
+                    description="Configuration initiale, installation, mise en service (prestation — URSSAF 23%)."
+                    amount={asm.amountDemarrage}
+                    onAmountChange={update("amountDemarrage")}
+                    badge="PREST · 23%"
+                    badgeColor="border-blue-500/50 text-blue-400"
+                />
+
+                {/* Récup données — PRESTATION 23% */}
+                <ServiceCard
+                    testid="asm-data"
+                    active={asm.dataRecovery}
+                    onToggle={() => setAsm((s) => ({ ...s, dataRecovery: !s.dataRecovery }))}
+                    icon={HardDrive}
+                    title="Récupération des données"
+                    description="Transfert des données ancien → nouveau PC (prestation — URSSAF 23%)."
+                    amount={asm.amountData}
+                    onAmountChange={update("amountData")}
+                    badge="PREST · 23%"
+                    badgeColor="border-blue-500/50 text-blue-400"
+                />
 
                 {/* Travel */}
-                <div className="space-y-2">
-                    <FieldLabel icon={MapPin}>Zone de déplacement</FieldLabel>
-                    <Select
-                        value={asm.travelZone}
-                        onValueChange={(v) => setAsm((s) => ({ ...s, travelZone: v }))}
-                    >
-                        <SelectTrigger
-                            data-testid="asm-select-travel"
-                            className="h-12 bg-[#0d0d0d] border border-[#333333] rounded-none focus:border-yellow-500 focus:ring-0 text-white text-sm px-4"
-                        >
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#0d0d0d] border border-[#333333] rounded-none text-white">
-                            {Object.entries(TRAVEL).map(([key, t]) => (
-                                <SelectItem
-                                    key={key}
-                                    value={key}
-                                    data-testid={`asm-travel-${key}`}
-                                    className="text-sm focus:bg-yellow-500 focus:text-black rounded-none cursor-pointer"
-                                >
-                                    <span className="flex items-center justify-between gap-6 w-full">
-                                        <span>{t.label}</span>
-                                        <span className="font-mono text-xs text-gray-400">+{t.price}€</span>
-                                    </span>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-gray-500 font-mono leading-relaxed">
-                        Vauvert 10€ · ≤ 15 km 20€ · 15–40 km 40€ · 40–100 km 80€
+                <div className="space-y-2 pt-2">
+                    <FieldLabel icon={MapPin}>Déplacement / Livraison</FieldLabel>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {travelOptions.map((t) => (
+                            <TravelButton
+                                key={t.key}
+                                option={t}
+                                active={asm.travelZone === t.key}
+                                onClick={() => setAsm((s) => ({ ...s, travelZone: t.key }))}
+                            />
+                        ))}
+                    </div>
+                    <p className="text-[11px] text-gray-500 font-mono">
+                        Le déplacement / livraison est compté comme prestation (URSSAF 23%).
                     </p>
                 </div>
 
-                {/* Reset */}
                 <button
                     data-testid="asm-btn-reset"
-                    onClick={() =>
+                    onClick={() => {
+                        const blank = (list) =>
+                            Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "" }]));
                         setAsm({
                             clientName: "",
+                            clientAddress: "",
+                            clientPostal: "",
+                            clientCity: "",
+                            clientPhone: "",
+                            clientEmail: "",
                             date: new Date().toISOString().slice(0, 10),
                             machineType: "fixe",
-                            partsCost: "",
+                            componentsFixe: blank(fixeComponents),
+                            componentsPortable: blank(portableComponents),
                             partsSale: "",
-                            baseService: true,
+                            licenseWindows: true,
+                            amountLicense: "30",
+                            premierDemarrage: true,
+                            amountDemarrage: "70",
                             dataRecovery: false,
+                            amountData: "50",
                             travelZone: "vauvert",
-                        })
-                    }
+                        });
+                    }}
                     className="mt-2 inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 hover:text-yellow-500 transition-colors"
                 >
                     <span className="h-px w-6 bg-current" />
