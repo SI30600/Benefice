@@ -49,13 +49,15 @@ export default function Calculator() {
         platform: "leboncoin",
         purchasePrice: "",
         salePrice: "",
-        delivery: "10",
+        deliveryZone: "vauvert",
     });
 
     const calc = useMemo(() => {
         const purchase = parseFloat(values.purchasePrice) || 0;
         const sale = parseFloat(values.salePrice) || 0;
-        const delivery = parseFloat(values.delivery) || 0;
+        const deliveryObj = TRAVEL_OPTIONS.find((t) => t.key === values.deliveryZone);
+        const delivery = deliveryObj?.price || 0;
+        const deliveryLabel = deliveryObj?.label || "";
         const lbcTax = +(purchase * 0.05).toFixed(2);
         const urssaf = +(sale * RATE_ARTICLE).toFixed(2);
         const totalCosts = +(purchase + lbcTax + delivery + urssaf).toFixed(2);
@@ -64,7 +66,7 @@ export default function Calculator() {
         const margin = sale > 0 ? +((netProfit / sale) * 100).toFixed(1) : 0;
         const roi = purchase > 0 ? +((netProfit / purchase) * 100).toFixed(1) : 0;
         return {
-            purchase, sale, delivery, lbcTax, urssaf,
+            purchase, sale, delivery, deliveryLabel, lbcTax, urssaf,
             totalCosts, grossProfit, netProfit, margin, roi,
             hasData: sale > 0 || purchase > 0,
         };
@@ -224,7 +226,11 @@ export default function Calculator() {
                 {mode === "quick" ? (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         <div className="lg:col-span-7">
-                            <CalcForm values={values} setValues={setValues} />
+                            <CalcForm
+                                values={values}
+                                setValues={setValues}
+                                travelOptions={TRAVEL_OPTIONS}
+                            />
                         </div>
                         <div className="lg:col-span-5 lg:sticky lg:top-8">
                             <ResultPanel calc={calc} itemName={values.itemName} />

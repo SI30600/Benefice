@@ -1,4 +1,4 @@
-import { Box, Calendar as CalendarIcon, Tag, Truck, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Box, Calendar as CalendarIcon, Tag, Truck, ArrowDownToLine, ArrowUpFromLine, MapPin } from "lucide-react";
 import {
     Select,
     SelectContent,
@@ -31,7 +31,30 @@ const InputBox = ({ children }) => (
     </div>
 );
 
-export default function CalcForm({ values, setValues }) {
+const TravelButton = ({ option, active, onClick }) => (
+    <button
+        data-testid={`quick-delivery-${option.key}`}
+        type="button"
+        onClick={onClick}
+        className={`flex flex-col items-start text-left p-3 border transition-all ${
+            active
+                ? "border-yellow-500 bg-yellow-500/10"
+                : "border-[#333333] bg-[#0d0d0d] hover:border-yellow-500/50"
+        }`}
+    >
+        <span className="flex items-center justify-between w-full mb-1">
+            <span className={`text-[11px] tracking-wider font-mono uppercase ${active ? "text-yellow-500" : "text-gray-300"}`}>
+                {option.label}
+            </span>
+            <span className={`text-sm font-mono font-bold ${active ? "text-yellow-500" : "text-white"}`}>
+                {option.price}€
+            </span>
+        </span>
+        <span className="text-[10px] text-gray-500 font-mono">{option.hint}</span>
+    </button>
+);
+
+export default function CalcForm({ values, setValues, travelOptions = [] }) {
     const update = (key) => (e) =>
         setValues((v) => ({ ...v, [key]: e.target.value }));
 
@@ -169,25 +192,23 @@ export default function CalcForm({ values, setValues }) {
                     </div>
                 </div>
 
-                {/* Row 4: Delivery */}
+                {/* Row 4: Delivery — boutons cliquables (mêmes options qu'assemblage) */}
                 <div className="space-y-2">
-                    <FieldLabel icon={Truck}>Frais de livraison (modifiable)</FieldLabel>
-                    <InputBox>
-                        <input
-                            data-testid="input-delivery"
-                            type="number"
-                            inputMode="decimal"
-                            step="0.01"
-                            min="0"
-                            value={values.delivery}
-                            onChange={update("delivery")}
-                            placeholder="10.00"
-                            className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
-                    </InputBox>
+                    <FieldLabel icon={MapPin}>Livraison / Déplacement</FieldLabel>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {travelOptions.map((t) => (
+                            <TravelButton
+                                key={t.key}
+                                option={t}
+                                active={values.deliveryZone === t.key}
+                                onClick={() =>
+                                    setValues((s) => ({ ...s, deliveryZone: t.key }))
+                                }
+                            />
+                        ))}
+                    </div>
                     <p className="text-[11px] text-gray-500 font-mono">
-                        Par défaut 10€ — ajuste selon ton coût réel.
+                        Choisis le mode de livraison ou la zone de déplacement.
                     </p>
                 </div>
 
@@ -201,7 +222,7 @@ export default function CalcForm({ values, setValues }) {
                             platform: "leboncoin",
                             purchasePrice: "",
                             salePrice: "",
-                            delivery: "10",
+                            deliveryZone: "vauvert",
                         })
                     }
                     className="mt-2 inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 hover:text-yellow-500 transition-colors"

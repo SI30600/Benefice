@@ -6,19 +6,22 @@ const fmt = (n) =>
         maximumFractionDigits: 2,
     }).format(n || 0);
 
-const Row = ({ label, value, color = "text-white", sign, testid, accent }) => (
+const Row = ({ label, value, color = "text-white", sign, testid, accent, hint }) => (
     <div
         data-testid={testid}
         className="flex items-center justify-between py-3 border-b border-[#222222] last:border-0"
     >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
             {accent && (
                 <span
-                    className="h-2 w-2 inline-block"
+                    className="h-2 w-2 inline-block shrink-0"
                     style={{ backgroundColor: accent }}
                 />
             )}
-            <span className="text-xs tracking-wide text-gray-400">{label}</span>
+            <span className="text-xs tracking-wide text-gray-400 truncate">{label}</span>
+            {hint && (
+                <span className="text-[10px] text-gray-600 font-mono shrink-0">{hint}</span>
+            )}
         </div>
         <span className={`font-mono text-sm tabular-nums ${color}`}>
             {sign}
