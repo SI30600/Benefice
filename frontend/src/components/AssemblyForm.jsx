@@ -407,30 +407,16 @@ export default function AssemblyForm({
                     badgeColor="border-orange-500/50 text-orange-400"
                 />
 
-                {/* Premier démarrage — PRESTATION 23% */}
+                {/* Premier démarrage + Récup données combinés — PRESTATION 23% */}
                 <ServiceCard
-                    testid="asm-demarrage"
-                    active={asm.premierDemarrage}
-                    onToggle={() => setAsm((s) => ({ ...s, premierDemarrage: !s.premierDemarrage }))}
+                    testid="asm-startup-data"
+                    active={asm.startupAndData}
+                    onToggle={() => setAsm((s) => ({ ...s, startupAndData: !s.startupAndData }))}
                     icon={Wrench}
-                    title="Premier démarrage"
-                    description="Configuration initiale, installation, mise en service (prestation — URSSAF 23%)."
-                    amount={asm.amountDemarrage}
-                    onAmountChange={update("amountDemarrage")}
-                    badge="PREST · 23%"
-                    badgeColor="border-blue-500/50 text-blue-400"
-                />
-
-                {/* Récup données — PRESTATION 23% */}
-                <ServiceCard
-                    testid="asm-data"
-                    active={asm.dataRecovery}
-                    onToggle={() => setAsm((s) => ({ ...s, dataRecovery: !s.dataRecovery }))}
-                    icon={HardDrive}
-                    title="Récupération des données"
-                    description="Transfert des données ancien → nouveau PC (prestation — URSSAF 23%)."
-                    amount={asm.amountData}
-                    onAmountChange={update("amountData")}
+                    title="Premier démarrage + Récupération données"
+                    description="Configuration initiale, installation Windows, transfert des données depuis l'ancien PC (prestation — URSSAF 23%)."
+                    amount={asm.amountStartupData}
+                    onAmountChange={update("amountStartupData")}
                     badge="PREST · 23%"
                     badgeColor="border-blue-500/50 text-blue-400"
                 />
@@ -472,10 +458,8 @@ export default function AssemblyForm({
                             partsSale: "",
                             licenseWindows: true,
                             amountLicense: "100",
-                            premierDemarrage: true,
-                            amountDemarrage: "60",
-                            dataRecovery: false,
-                            amountData: "50",
+                            startupAndData: true,
+                            amountStartupData: "60",
                             travelZone: "vauvert",
                         });
                     }}

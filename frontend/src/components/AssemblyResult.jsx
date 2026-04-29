@@ -158,21 +158,11 @@ export default function AssemblyResult({ calc, clientName }) {
                             Prestations · 23%
                         </div>
                     </div>
-                    {calc.demarrageFee > 0 && (
+                    {calc.startupDataFee > 0 && (
                         <Row
-                            testid="asm-row-demarrage"
-                            label="Premier démarrage"
-                            value={calc.demarrageFee}
-                            sign="+"
-                            color="text-blue-400"
-                            accent="#3B82F6"
-                        />
-                    )}
-                    {calc.dataFee > 0 && (
-                        <Row
-                            testid="asm-row-data"
-                            label="Récupération données"
-                            value={calc.dataFee}
+                            testid="asm-row-startup-data"
+                            label="Premier démarrage + Récup données"
+                            value={calc.startupDataFee}
                             sign="+"
                             color="text-blue-400"
                             accent="#3B82F6"

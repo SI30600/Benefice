@@ -26,7 +26,7 @@ HEADERS = [
     "Date", "Nom client", "Adresse", "Code postal", "Ville",
     "Téléphone", "Email", "Type machine",
     "Composants (détail)", "Coût pièces (€)", "Pièces facturées (€)",
-    "Licence Windows (€)", "Premier démarrage (€)", "Récup. données (€)",
+    "Licence Windows (€)", "Démarrage + Récup données (€)",
     "Déplacement (zone)", "Déplacement (€)",
     "Total facturé (€)", "Taxe LBC (€)", "URSSAF Articles 13% (€)",
     "URSSAF Prestations 23% (€)", "Bénéfice net (€)", "Marge (%)",

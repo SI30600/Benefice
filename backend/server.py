@@ -56,8 +56,7 @@ class DevisPayload(BaseModel):
     partsCost: float = 0
     partsSale: float = 0
     licenseFee: float = 0
-    demarrageFee: float = 0
-    dataFee: float = 0
+    startupDataFee: float = 0
     travelLabel: str = ""
     travelAmount: float = 0
     totalBilled: float = 0
@@ -208,8 +207,7 @@ async def save_devis(payload: DevisPayload = Body(...)):
         payload.partsCost,
         payload.partsSale,
         payload.licenseFee,
-        payload.demarrageFee,
-        payload.dataFee,
+        payload.startupDataFee,
         payload.travelLabel,
         payload.travelAmount,
         payload.totalBilled,

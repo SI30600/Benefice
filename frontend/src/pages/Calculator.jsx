@@ -89,10 +89,8 @@ export default function Calculator() {
         licenseWindows: true,
         amountLicense: "100",
         // Prestations (23%)
-        premierDemarrage: true,
-        amountDemarrage: "60",
-        dataRecovery: false,
-        amountData: "50",
+        startupAndData: true,
+        amountStartupData: "60",
         travelZone: "vauvert",
     });
 
@@ -108,16 +106,15 @@ export default function Calculator() {
 
         const partsSale = parseFloat(asm.partsSale) || 0;
         const licenseFee = asm.licenseWindows ? parseFloat(asm.amountLicense) || 0 : 0;
-        const demarrageFee = asm.premierDemarrage ? parseFloat(asm.amountDemarrage) || 0 : 0;
-        const dataFee = asm.dataRecovery ? parseFloat(asm.amountData) || 0 : 0;
+        const startupDataFee = asm.startupAndData ? parseFloat(asm.amountStartupData) || 0 : 0;
 
         const travelObj = TRAVEL_OPTIONS.find((t) => t.key === asm.travelZone);
         const travel = travelObj?.price || 0;
 
         // Articles bucket (13%)
         const articlesTotal = +(partsSale + licenseFee).toFixed(2);
-        // Prestations bucket (23%) — incl. travel/déplacement
-        const prestationsTotal = +(demarrageFee + dataFee + travel).toFixed(2);
+        // Prestations bucket (23%)
+        const prestationsTotal = +(startupDataFee + travel).toFixed(2);
 
         const lbcTax = +(partsCost * 0.05).toFixed(2);
         const urssafArticles = +(articlesTotal * RATE_ARTICLE).toFixed(2);
@@ -131,7 +128,7 @@ export default function Calculator() {
 
         return {
             partsCost, partsSale, lbcTax,
-            licenseFee, demarrageFee, dataFee, travel,
+            licenseFee, startupDataFee, travel,
             travelLabel: travelObj?.label,
             articlesTotal, prestationsTotal,
             urssafArticles, urssafPrestations, urssaf,
@@ -260,8 +257,7 @@ export default function Calculator() {
                                         partsCost: asmCalc.partsCost,
                                         partsSale: asmCalc.partsSale,
                                         licenseFee: asmCalc.licenseFee,
-                                        demarrageFee: asmCalc.demarrageFee,
-                                        dataFee: asmCalc.dataFee,
+                                        startupDataFee: asmCalc.startupDataFee,
                                         travelLabel: asmCalc.travelLabel || "",
                                         travelAmount: asmCalc.travel,
                                         totalBilled: asmCalc.totalBilled,
