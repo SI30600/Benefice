@@ -572,6 +572,33 @@ export default function FinanceTab() {
                                         dont − {fmt(cur.achats)} € de dépenses déduites
                                     </div>
                                 )}
+                                {prev && (
+                                    (() => {
+                                        const currentPocket = cur.net_in_pocket ?? cur.net_after_taxes ?? 0;
+                                        const prevPocket = prev.net_in_pocket ?? prev.net_after_taxes ?? 0;
+                                        const delta = currentPocket - prevPocket;
+                                        const pct = prevPocket !== 0 ? (delta / Math.abs(prevPocket)) * 100 : 0;
+                                        const positive = delta >= 0;
+                                        return (
+                                            <div
+                                                data-testid="pocket-delta"
+                                                className={`mt-3 inline-flex items-center gap-1.5 px-2 py-1 border ${positive ? "border-green-500/40 bg-green-900/20" : "border-red-500/40 bg-red-900/20"}`}
+                                            >
+                                                <span className={`text-[11px] font-mono font-bold ${positive ? "text-green-400" : "text-red-400"}`}>
+                                                    {positive ? "▲" : "▼"} {positive ? "+" : ""}{fmt(delta)} €
+                                                </span>
+                                                <span className="text-[9px] tracking-[0.15em] uppercase font-mono text-gray-500">
+                                                    vs {monthLabel(summary.previous_month).split(" ")[0]}
+                                                </span>
+                                                {prevPocket !== 0 && (
+                                                    <span className={`text-[10px] font-mono ${positive ? "text-green-400/80" : "text-red-400/80"}`}>
+                                                        ({positive ? "+" : ""}{pct.toFixed(0)}%)
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })()
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
