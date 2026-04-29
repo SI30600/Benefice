@@ -87,10 +87,10 @@ export default function Calculator() {
         partsSale: "",
         // Articles (13%)
         licenseWindows: true,
-        amountLicense: "30",
+        amountLicense: "100",
         // Prestations (23%)
         premierDemarrage: true,
-        amountDemarrage: "70",
+        amountDemarrage: "60",
         dataRecovery: false,
         amountData: "50",
         travelZone: "vauvert",
