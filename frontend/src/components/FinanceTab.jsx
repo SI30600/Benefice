@@ -841,6 +841,11 @@ export default function FinanceTab() {
                 </SectionTitle>
                 <p className="text-[10px] text-gray-500 font-mono mb-4">
                     Projection du solde dispo de aujourd'hui à la fin du mois — tient compte des prélèvements et abos datés
+                    {cur && cur.total_taxes > 0 && (
+                        <span className="ml-2 text-yellow-500">
+                            · ligne jaune = réserve URSSAF du mois prochain ({fmt(cur.total_taxes)} €)
+                        </span>
+                    )}
                     {projectionMin < 0 && (
                         <span className="ml-2 text-red-400">⚠ point bas prévu : {fmt(projectionMin)} €</span>
                     )}
@@ -877,7 +882,20 @@ export default function FinanceTab() {
                                     labelFormatter={(d) => `Jour ${String(d).padStart(2, "0")}`}
                                     formatter={(value) => [`${fmt(value)} €`, "Solde projeté"]}
                                 />
-                                <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
+                                <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "0 €", fill: "#ef4444", fontSize: 10, position: "insideRight" }} />
+                                {cur && cur.total_taxes > 0 && (
+                                    <ReferenceLine
+                                        y={cur.total_taxes}
+                                        stroke="#eab308"
+                                        strokeDasharray="4 4"
+                                        label={{
+                                            value: `Réserve URSSAF M+1 : ${fmt(cur.total_taxes)} €`,
+                                            fill: "#eab308",
+                                            fontSize: 10,
+                                            position: "insideTopRight",
+                                        }}
+                                    />
+                                )}
                                 <Line
                                     type="monotone"
                                     dataKey="solde"
