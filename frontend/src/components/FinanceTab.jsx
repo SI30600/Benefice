@@ -22,6 +22,14 @@ const monthLabel = (yyyymm) => {
     return dt.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 };
 
+// Retourne YYYY-MM du mois M+2 (mois de prélèvement URSSAF pour un CA donné)
+const nextNextMonth = (yyyymm) => {
+    if (!yyyymm) return "";
+    const [y, m] = yyyymm.split("-");
+    const dt = new Date(Number(y), Number(m) - 1 + 2, 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+};
+
 const SectionCard = ({ children, className = "" }) => (
     <div className={`bg-[#111111] border border-[#262626] p-5 md:p-6 ${className}`}>
         {children}
@@ -63,12 +71,6 @@ export default function FinanceTab() {
     const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
     const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
-    const [urssafNext, setUrssafNext] = useState(() => {
-        try { return parseFloat(localStorage.getItem("urssaf_next") || "0") || 0; } catch { return 0; }
-    });
-    const [urssafNextInput, setUrssafNextInput] = useState(() => {
-        try { return localStorage.getItem("urssaf_next") || ""; } catch { return ""; }
-    });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -375,7 +377,8 @@ export default function FinanceTab() {
         });
 
         // URSSAF : déclaration mensuelle, prélèvement le 4 de M+2
-        // Le 4 du mois SUIVANT = URSSAF de M-1 (saisie manuelle, ex: 483 € connu d'avance)
+        // Le 4 du mois SUIVANT = URSSAF de M-1 (CA du mois précédent, calculé depuis summary.previous)
+        const urssafNext = (summary?.previous?.total_taxes) || 0;
         if (urssafNext > 0) {
             const m1 = new Date(now.getFullYear(), now.getMonth() + 1, 4);
             const diff1 = Math.floor((m1 - now) / (1000 * 60 * 60 * 24));
@@ -409,7 +412,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, urssafNext]);
+    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, summary]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
@@ -553,6 +556,42 @@ export default function FinanceTab() {
                                 </div>
                             </div>
 
+                            {/* Détail URSSAF — à checker avant déclaration */}
+                            <div className="mt-3 border border-orange-500/40 bg-[#0d0d0d] p-3" data-testid="urssaf-breakdown">
+                                <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-orange-400 mb-2">
+                                    Détail URSSAF à déclarer
+                                </div>
+                                <div className="space-y-1 text-[11px] font-mono">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">URSSAF ventes <span className="text-gray-600">(12,3%)</span></span>
+                                        <span className="text-orange-400">{fmt(cur.urssaf_materiel)} €</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">URSSAF presta <span className="text-gray-600">(21,2%)</span></span>
+                                        <span className="text-orange-400">{fmt(cur.urssaf_presta + (cur.urssaf_formation || 0))} €</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Impôt ventes <span className="text-gray-600">(1%)</span></span>
+                                        <span className="text-orange-400">{fmt(cur.impot_vente)} €</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Impôt presta <span className="text-gray-600">(1,7%)</span></span>
+                                        <span className="text-orange-400">{fmt(cur.impot_presta + (cur.impot_formation || 0))} €</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">CFP <span className="text-gray-600">(0,2%)</span></span>
+                                        <span className="text-orange-400">{fmt(cur.cfp)} €</span>
+                                    </div>
+                                    <div className="flex justify-between pt-1.5 mt-1.5 border-t border-[#333333]">
+                                        <span className="text-white font-semibold uppercase tracking-wider text-[10px]">Total à payer</span>
+                                        <span className="text-red-400 font-bold text-base">{fmt(cur.total_taxes)} €</span>
+                                    </div>
+                                </div>
+                                <div className="text-[9px] text-gray-500 font-mono mt-2">
+                                    Prélèvement prévu le 4 {monthLabel(nextNextMonth(month))}
+                                </div>
+                            </div>
+
                             {prev && (
                                 <div className="mt-4 pt-4 border-t border-[#333333]">
                                     <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-400 mb-2">
@@ -646,34 +685,16 @@ export default function FinanceTab() {
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
                                 Prochaine URSSAF (le 4 de M+1)
                             </label>
-                            <div className="flex gap-2 mt-1.5 mb-3">
-                                <input
-                                    data-testid="urssaf-next-input"
-                                    type="number"
-                                    step="0.01"
-                                    value={urssafNextInput}
-                                    onChange={(e) => setUrssafNextInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            const v = parseFloat(urssafNextInput) || 0;
-                                            setUrssafNext(v);
-                                            try { localStorage.setItem("urssaf_next", urssafNextInput); } catch {}
-                                        }
-                                    }}
-                                    placeholder="Ex: 483 (URSSAF mois dernier)"
-                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-orange-500 text-orange-400 text-lg font-mono font-bold focus:outline-none"
-                                />
-                                <button
-                                    data-testid="urssaf-next-save"
-                                    onClick={() => {
-                                        const v = parseFloat(urssafNextInput) || 0;
-                                        setUrssafNext(v);
-                                        try { localStorage.setItem("urssaf_next", urssafNextInput); } catch {}
-                                    }}
-                                    className="px-3 bg-orange-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-orange-400"
+                            <div className="flex items-center gap-2 mt-1.5 mb-3 h-11 px-3 bg-[#0a0a0a] border border-[#222222]">
+                                <span
+                                    data-testid="urssaf-next-auto"
+                                    className="flex-1 text-orange-400 text-lg font-mono font-bold"
                                 >
-                                    OK
-                                </button>
+                                    {fmt(summary?.previous?.total_taxes || 0)} €
+                                </span>
+                                <span className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500">
+                                    auto · {summary?.previous_month ? monthLabel(summary.previous_month) : "—"}
+                                </span>
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
