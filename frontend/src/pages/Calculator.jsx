@@ -88,9 +88,10 @@ export default function Calculator() {
         // Articles (13%)
         licenseWindows: true,
         amountLicense: "100",
-        // Prestations (23%)
-        startupAndData: true,
-        amountStartupData: "60",
+        // Prestations (23%) — radio: "withData" | "withoutData" | "none"
+        serviceVariant: "withData",
+        amountWithData: "60",
+        amountWithoutData: "40",
         travelZone: "vauvert",
     });
 
@@ -106,7 +107,16 @@ export default function Calculator() {
 
         const partsSale = parseFloat(asm.partsSale) || 0;
         const licenseFee = asm.licenseWindows ? parseFloat(asm.amountLicense) || 0 : 0;
-        const startupDataFee = asm.startupAndData ? parseFloat(asm.amountStartupData) || 0 : 0;
+
+        let serviceFee = 0;
+        let serviceLabel = "";
+        if (asm.serviceVariant === "withData") {
+            serviceFee = parseFloat(asm.amountWithData) || 0;
+            serviceLabel = "Premier démarrage + Récup. données";
+        } else if (asm.serviceVariant === "withoutData") {
+            serviceFee = parseFloat(asm.amountWithoutData) || 0;
+            serviceLabel = "Premier démarrage";
+        }
 
         const travelObj = TRAVEL_OPTIONS.find((t) => t.key === asm.travelZone);
         const travel = travelObj?.price || 0;
@@ -114,7 +124,7 @@ export default function Calculator() {
         // Articles bucket (13%)
         const articlesTotal = +(partsSale + licenseFee).toFixed(2);
         // Prestations bucket (23%)
-        const prestationsTotal = +(startupDataFee + travel).toFixed(2);
+        const prestationsTotal = +(serviceFee + travel).toFixed(2);
 
         const lbcTax = +(partsCost * 0.05).toFixed(2);
         const urssafArticles = +(articlesTotal * RATE_ARTICLE).toFixed(2);
@@ -128,7 +138,7 @@ export default function Calculator() {
 
         return {
             partsCost, partsSale, lbcTax,
-            licenseFee, startupDataFee, travel,
+            licenseFee, serviceFee, serviceLabel, travel,
             travelLabel: travelObj?.label,
             articlesTotal, prestationsTotal,
             urssafArticles, urssafPrestations, urssaf,
@@ -257,7 +267,8 @@ export default function Calculator() {
                                         partsCost: asmCalc.partsCost,
                                         partsSale: asmCalc.partsSale,
                                         licenseFee: asmCalc.licenseFee,
-                                        startupDataFee: asmCalc.startupDataFee,
+                                        serviceFee: asmCalc.serviceFee,
+                                        serviceLabel: asmCalc.serviceLabel,
                                         travelLabel: asmCalc.travelLabel || "",
                                         travelAmount: asmCalc.travel,
                                         totalBilled: asmCalc.totalBilled,

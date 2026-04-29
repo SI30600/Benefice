@@ -407,19 +407,104 @@ export default function AssemblyForm({
                     badgeColor="border-orange-500/50 text-orange-400"
                 />
 
-                {/* Premier démarrage + Récup données combinés — PRESTATION 23% */}
-                <ServiceCard
-                    testid="asm-startup-data"
-                    active={asm.startupAndData}
-                    onToggle={() => setAsm((s) => ({ ...s, startupAndData: !s.startupAndData }))}
-                    icon={Wrench}
-                    title="Premier démarrage + Récupération données"
-                    description="Configuration initiale, installation Windows, transfert des données depuis l'ancien PC (prestation — URSSAF 23%)."
-                    amount={asm.amountStartupData}
-                    onAmountChange={update("amountStartupData")}
-                    badge="PREST · 23%"
-                    badgeColor="border-blue-500/50 text-blue-400"
-                />
+                {/* Premier démarrage — radio entre 2 variantes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                        {
+                            key: "withData",
+                            title: "Avec récup. données",
+                            desc: "Démarrage + récupération des données ancien PC.",
+                            amountField: "amountWithData",
+                        },
+                        {
+                            key: "withoutData",
+                            title: "Sans récup. données",
+                            desc: "Premier démarrage seul (sans transfert de données).",
+                            amountField: "amountWithoutData",
+                        },
+                    ].map((opt) => {
+                        const active = asm.serviceVariant === opt.key;
+                        return (
+                            <div
+                                key={opt.key}
+                                className={`border transition-all ${
+                                    active
+                                        ? "border-yellow-500 bg-yellow-500/5"
+                                        : "border-[#333333] bg-[#0d0d0d]"
+                                }`}
+                            >
+                                <div className="p-4">
+                                    <button
+                                        data-testid={`asm-service-${opt.key}`}
+                                        type="button"
+                                        onClick={() =>
+                                            setAsm((s) => ({
+                                                ...s,
+                                                serviceVariant: active ? "none" : opt.key,
+                                            }))
+                                        }
+                                        className="flex items-center gap-3 w-full text-left"
+                                    >
+                                        <span
+                                            className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                                active
+                                                    ? "border-yellow-500"
+                                                    : "border-[#444444]"
+                                            }`}
+                                        >
+                                            {active && (
+                                                <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                                            )}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <Wrench className="h-3.5 w-3.5 text-yellow-500" />
+                                                <span className="text-sm font-semibold text-white">
+                                                    {opt.title}
+                                                </span>
+                                                <span className="text-[9px] font-mono tracking-[0.15em] uppercase px-1.5 py-0.5 border border-blue-500/50 text-blue-400">
+                                                    PREST · 23%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </button>
+                                    <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                                        {opt.desc}
+                                    </p>
+                                    <div className="mt-3 flex items-center justify-end gap-1">
+                                        <input
+                                            data-testid={`asm-service-${opt.key}-amount`}
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="1"
+                                            min="0"
+                                            value={asm[opt.amountField]}
+                                            onChange={update(opt.amountField)}
+                                            disabled={!active}
+                                            className="w-20 h-9 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-base font-mono font-semibold text-right px-2 focus:outline-none disabled:opacity-50"
+                                        />
+                                        <span className="font-mono text-base font-semibold text-yellow-500">
+                                            €
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <button
+                    data-testid="asm-service-none"
+                    type="button"
+                    onClick={() => setAsm((s) => ({ ...s, serviceVariant: "none" }))}
+                    className={`text-[10px] tracking-[0.25em] uppercase font-mono transition-colors ${
+                        asm.serviceVariant === "none"
+                            ? "text-yellow-500"
+                            : "text-gray-500 hover:text-yellow-500"
+                    }`}
+                >
+                    {asm.serviceVariant === "none" ? "✓ aucune prestation" : "désélectionner"}
+                </button>
 
                 {/* Travel */}
                 <div className="space-y-2 pt-2">
@@ -458,8 +543,9 @@ export default function AssemblyForm({
                             partsSale: "",
                             licenseWindows: true,
                             amountLicense: "100",
-                            startupAndData: true,
-                            amountStartupData: "60",
+                            serviceVariant: "withData",
+                            amountWithData: "60",
+                            amountWithoutData: "40",
                             travelZone: "vauvert",
                         });
                     }}
