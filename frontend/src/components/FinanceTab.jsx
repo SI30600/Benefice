@@ -63,6 +63,12 @@ export default function FinanceTab() {
     const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
     const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
+    const [urssafNext, setUrssafNext] = useState(() => {
+        try { return parseFloat(localStorage.getItem("urssaf_next") || "0") || 0; } catch { return 0; }
+    });
+    const [urssafNextInput, setUrssafNextInput] = useState(() => {
+        try { return localStorage.getItem("urssaf_next") || ""; } catch { return ""; }
+    });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -368,13 +374,22 @@ export default function FinanceTab() {
             }
         });
 
-        // URSSAF : prélevée le 4 du mois suivant, montant = taxes du mois courant
-        // Pour les mois suivants, on n'a pas encore le CA → on n'inclut que la prochaine échéance certaine
+        // URSSAF : déclaration mensuelle, prélèvement le 4 de M+2
+        // Le 4 du mois SUIVANT = URSSAF de M-1 (saisie manuelle, ex: 483 € connu d'avance)
+        if (urssafNext > 0) {
+            const m1 = new Date(now.getFullYear(), now.getMonth() + 1, 4);
+            const diff1 = Math.floor((m1 - now) / (1000 * 60 * 60 * 24));
+            if (diff1 >= 0 && diff1 <= HORIZON_DAYS) {
+                const key = m1.toISOString().slice(0, 10);
+                if (key in eventsByDate) eventsByDate[key] -= urssafNext;
+            }
+        }
+        // Le 4 de M+2 = URSSAF du CA du mois courant (calculée automatiquement)
         if (cur.total_taxes > 0) {
-            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 4);
-            const daysDiff = Math.floor((nextMonth - now) / (1000 * 60 * 60 * 24));
-            if (daysDiff >= 0 && daysDiff <= HORIZON_DAYS) {
-                const key = nextMonth.toISOString().slice(0, 10);
+            const m2 = new Date(now.getFullYear(), now.getMonth() + 2, 4);
+            const diff2 = Math.floor((m2 - now) / (1000 * 60 * 60 * 24));
+            if (diff2 >= 0 && diff2 <= HORIZON_DAYS) {
+                const key = m2.toISOString().slice(0, 10);
                 if (key in eventsByDate) eventsByDate[key] -= cur.total_taxes;
             }
         }
@@ -394,7 +409,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur]);
+    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, urssafNext]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
@@ -623,6 +638,39 @@ export default function FinanceTab() {
                                     data-testid="balance-save"
                                     onClick={saveBalance}
                                     className="px-3 bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-yellow-400"
+                                >
+                                    OK
+                                </button>
+                            </div>
+
+                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
+                                Prochaine URSSAF (le 4 de M+1)
+                            </label>
+                            <div className="flex gap-2 mt-1.5 mb-3">
+                                <input
+                                    data-testid="urssaf-next-input"
+                                    type="number"
+                                    step="0.01"
+                                    value={urssafNextInput}
+                                    onChange={(e) => setUrssafNextInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            const v = parseFloat(urssafNextInput) || 0;
+                                            setUrssafNext(v);
+                                            try { localStorage.setItem("urssaf_next", urssafNextInput); } catch {}
+                                        }
+                                    }}
+                                    placeholder="Ex: 483 (URSSAF mois dernier)"
+                                    className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-orange-500 text-orange-400 text-lg font-mono font-bold focus:outline-none"
+                                />
+                                <button
+                                    data-testid="urssaf-next-save"
+                                    onClick={() => {
+                                        const v = parseFloat(urssafNextInput) || 0;
+                                        setUrssafNext(v);
+                                        try { localStorage.setItem("urssaf_next", urssafNextInput); } catch {}
+                                    }}
+                                    className="px-3 bg-orange-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-orange-400"
                                 >
                                     OK
                                 </button>
