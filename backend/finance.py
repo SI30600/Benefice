@@ -95,6 +95,7 @@ class RecurringRevenue(BaseModel):
     label: str         # nom client ex: SOMNUM
     amount: float
     day_of_month: int  # 1-31
+    prepaid: bool = False   # si True : pas compté dans prévisionnel mensuel (payé pour l'année)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -102,6 +103,7 @@ class RecurringRevenueCreate(BaseModel):
     label: str
     amount: float
     day_of_month: int
+    prepaid: bool = False
 
 
 class AccountBalance(BaseModel):

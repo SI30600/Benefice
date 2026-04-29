@@ -73,7 +73,7 @@ export default function FinanceTab() {
     const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "prestation" });
     const [lbcForm, setLbcForm] = useState({ label: "", amount: "" });
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
-    const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "" });
+    const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
     const [lbcPendingInput, setLbcPendingInput] = useState("");
@@ -187,8 +187,9 @@ export default function FinanceTab() {
             label: revenueForm.label,
             amount: amt,
             day_of_month: day,
+            prepaid: !!revenueForm.prepaid,
         });
-        setRevenueForm({ label: "", amount: "", day_of_month: "" });
+        setRevenueForm({ label: "", amount: "", day_of_month: "", prepaid: false });
         refresh();
     };
 
@@ -216,7 +217,7 @@ export default function FinanceTab() {
         [charges.items, todayDay]
     );
     const revenuesUpcoming = useMemo(
-        () => revenues.items.filter((r) => (r.day_of_month || 0) >= todayDay),
+        () => revenues.items.filter((r) => !r.prepaid && (r.day_of_month || 0) >= todayDay),
         [revenues.items, todayDay]
     );
     const chargesUpcomingTotal = useMemo(
@@ -782,10 +783,10 @@ export default function FinanceTab() {
                 {/* Abonnements clients récurrents */}
                 <SectionCard>
                     <SectionTitle icon={ArrowDownToLine} accent="text-green-400">
-                        Abonnements clients · {fmt(revenues.total)} €
+                        Abonnements clients · {revenues.count || revenues.items.length} client{(revenues.count || revenues.items.length) > 1 ? "s" : ""} · {fmt(revenues.total)} €
                     </SectionTitle>
                     <p className="text-[10px] text-gray-500 font-mono mb-3">
-                        Revenus récurrents (SOMNUM, JLP…) — ajoutés au prévisionnel
+                        Revenus récurrents — clients en maintenance mensuelle
                     </p>
                     <div className="grid grid-cols-12 gap-2 mb-3">
                         <input
@@ -816,6 +817,16 @@ export default function FinanceTab() {
                             placeholder="Jour"
                             className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-green-500 text-gray-300 text-sm font-mono focus:outline-none"
                         />
+                        <label className="col-span-12 flex items-center gap-2 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-400 cursor-pointer select-none">
+                            <input
+                                data-testid="revenue-prepaid"
+                                type="checkbox"
+                                checked={!!revenueForm.prepaid}
+                                onChange={(e) => setRevenueForm({ ...revenueForm, prepaid: e.target.checked })}
+                                className="h-3.5 w-3.5 accent-blue-500"
+                            />
+                            Prépayé (annuel · n'affecte pas le prévisionnel)
+                        </label>
                         <button
                             data-testid="revenue-add"
                             onClick={addRevenue}
@@ -833,18 +844,25 @@ export default function FinanceTab() {
                     ) : (
                         <div className="space-y-1 max-h-60 overflow-y-auto">
                             {revenues.items.map((r) => {
-                                const upcoming = (r.day_of_month || 0) >= todayDay;
+                                const upcoming = !r.prepaid && (r.day_of_month || 0) >= todayDay;
                                 return (
                                     <div
                                         key={r.id}
                                         data-testid={`revenue-item-${r.id}`}
-                                        className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                        className={`flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border ${r.prepaid ? "border-blue-900/60" : "border-[#222222]"}`}
                                     >
                                         <span className={`font-mono text-[10px] w-8 text-center ${upcoming ? "text-green-400" : "text-gray-600"}`}>
-                                            {String(r.day_of_month).padStart(2, "0")}
+                                            {r.prepaid ? "AN" : String(r.day_of_month).padStart(2, "0")}
                                         </span>
-                                        <span className="flex-1 text-sm text-white truncate">{r.label}</span>
-                                        <span className={`font-mono text-sm font-bold shrink-0 ${upcoming ? "text-green-400" : "text-gray-500 line-through"}`}>
+                                        <span className="flex-1 text-sm text-white truncate flex items-center gap-2">
+                                            {r.label}
+                                            {r.prepaid && (
+                                                <span className="text-[9px] tracking-[0.15em] uppercase font-mono text-blue-400 border border-blue-600/50 px-1.5 py-[1px]">
+                                                    prépayé
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className={`font-mono text-sm font-bold shrink-0 ${r.prepaid ? "text-blue-400" : upcoming ? "text-green-400" : "text-gray-500 line-through"}`}>
                                             {fmt(r.amount)} €
                                         </span>
                                         <button
