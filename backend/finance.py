@@ -49,6 +49,7 @@ class PendingPayment(BaseModel):
     client_name: str
     amount: float
     note: str = ""
+    category: Category = "prestation"
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     paid: bool = False
 
@@ -57,6 +58,7 @@ class PendingPaymentCreate(BaseModel):
     client_name: str
     amount: float
     note: str = ""
+    category: Category = "prestation"
 
 
 class LbcPurchase(BaseModel):
@@ -70,6 +72,36 @@ class LbcPurchase(BaseModel):
 class LbcPurchaseCreate(BaseModel):
     label: str
     amount: float
+
+
+class MonthlyCharge(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    label: str
+    amount: float
+    day_of_month: int  # 1-31
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class MonthlyChargeCreate(BaseModel):
+    label: str
+    amount: float
+    day_of_month: int
+
+
+class RecurringRevenue(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    label: str         # nom client ex: SOMNUM
+    amount: float
+    day_of_month: int  # 1-31
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class RecurringRevenueCreate(BaseModel):
+    label: str
+    amount: float
+    day_of_month: int
 
 
 class AccountBalance(BaseModel):

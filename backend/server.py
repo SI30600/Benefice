@@ -15,6 +15,8 @@ from finance import (
     FinanceEntry, FinanceEntryCreate, PendingPayment, PendingPaymentCreate,
     AccountBalance, compute_summary, CATEGORIES,
     LbcPurchase, LbcPurchaseCreate,
+    MonthlyCharge, MonthlyChargeCreate,
+    RecurringRevenue, RecurringRevenueCreate,
 )
 from portal_auth import (
     build_portal_auth_url, exchange_code as portal_exchange_code,
@@ -230,6 +232,28 @@ async def delete_pending_payment(payment_id: str, _=Depends(require_auth)):
     return {"deleted": True}
 
 
+@api_router.post("/finance/pending/{payment_id}/confirm")
+async def confirm_pending_payment(payment_id: str, _=Depends(require_auth)):
+    """Convertit un paiement en attente en écriture CA et supprime le pending."""
+    doc = await db.pending_payments.find_one({"id": payment_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
+    category = doc.get("category") or "prestation"
+    if category not in CATEGORIES:
+        category = "prestation"
+    entry = FinanceEntry(
+        date=datetime.now(timezone.utc).date().isoformat(),
+        category=category,
+        amount=float(doc.get("amount") or 0),
+        description=f"Encaissement {doc.get('client_name', '')}{(' — ' + doc['note']) if doc.get('note') else ''}".strip(),
+        client_name=doc.get("client_name", ""),
+        source="pending",
+    )
+    await db.finance_entries.insert_one(entry.model_dump())
+    await db.pending_payments.delete_one({"id": payment_id})
+    return {"encaisse": True, "entry": entry.model_dump()}
+
+
 # ---- Finance: account balance ----------------------------------------------
 
 BALANCE_DOC_ID = "default"
@@ -254,6 +278,58 @@ async def delete_lbc_purchase(purchase_id: str, _=Depends(require_auth)):
     res = await db.lbc_purchases.delete_one({"id": purchase_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Achat introuvable")
+    return {"deleted": True}
+
+
+# ---- Finance: monthly recurring charges ------------------------------------
+
+@api_router.post("/finance/monthly-charges", response_model=MonthlyCharge)
+async def create_monthly_charge(payload: MonthlyChargeCreate, _=Depends(require_auth)):
+    if payload.day_of_month < 1 or payload.day_of_month > 31:
+        raise HTTPException(status_code=400, detail="Jour invalide (1-31)")
+    item = MonthlyCharge(**payload.model_dump())
+    await db.monthly_charges.insert_one(item.model_dump())
+    return item
+
+
+@api_router.get("/finance/monthly-charges")
+async def list_monthly_charges(_=Depends(require_auth)):
+    rows = await db.monthly_charges.find({}, {"_id": 0}).sort("day_of_month", 1).to_list(500)
+    total = round(sum(r.get("amount", 0) for r in rows), 2)
+    return {"items": rows, "total": total, "count": len(rows)}
+
+
+@api_router.delete("/finance/monthly-charges/{charge_id}")
+async def delete_monthly_charge(charge_id: str, _=Depends(require_auth)):
+    res = await db.monthly_charges.delete_one({"id": charge_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Charge introuvable")
+    return {"deleted": True}
+
+
+# ---- Finance: recurring client revenues ------------------------------------
+
+@api_router.post("/finance/recurring-revenues", response_model=RecurringRevenue)
+async def create_recurring_revenue(payload: RecurringRevenueCreate, _=Depends(require_auth)):
+    if payload.day_of_month < 1 or payload.day_of_month > 31:
+        raise HTTPException(status_code=400, detail="Jour invalide (1-31)")
+    item = RecurringRevenue(**payload.model_dump())
+    await db.recurring_revenues.insert_one(item.model_dump())
+    return item
+
+
+@api_router.get("/finance/recurring-revenues")
+async def list_recurring_revenues(_=Depends(require_auth)):
+    rows = await db.recurring_revenues.find({}, {"_id": 0}).sort("day_of_month", 1).to_list(500)
+    total = round(sum(r.get("amount", 0) for r in rows), 2)
+    return {"items": rows, "total": total, "count": len(rows)}
+
+
+@api_router.delete("/finance/recurring-revenues/{revenue_id}")
+async def delete_recurring_revenue(revenue_id: str, _=Depends(require_auth)):
+    res = await db.recurring_revenues.delete_one({"id": revenue_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Abonnement introuvable")
     return {"deleted": True}
 
 

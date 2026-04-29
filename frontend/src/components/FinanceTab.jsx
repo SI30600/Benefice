@@ -57,6 +57,8 @@ export default function FinanceTab() {
     const [entries, setEntries] = useState([]);
     const [pending, setPending] = useState({ items: [], total: 0 });
     const [lbcList, setLbcList] = useState({ items: [], total: 0 });
+    const [charges, setCharges] = useState({ items: [], total: 0 });
+    const [revenues, setRevenues] = useState({ items: [], total: 0 });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -68,8 +70,10 @@ export default function FinanceTab() {
         description: "",
         client_name: "",
     });
-    const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "" });
+    const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "prestation" });
     const [lbcForm, setLbcForm] = useState({ label: "", amount: "" });
+    const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
+    const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
     const [lbcPendingInput, setLbcPendingInput] = useState("");
@@ -77,16 +81,22 @@ export default function FinanceTab() {
     const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumR, entR, penR, balR] = await Promise.all([
+            const [sumR, entR, penR, balR, lbcR, chargesR, revR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
                 axios.get(`${API}/finance/balance`),
+                axios.get(`${API}/finance/lbc-purchases`),
+                axios.get(`${API}/finance/monthly-charges`),
+                axios.get(`${API}/finance/recurring-revenues`),
             ]);
             setSummary(sumR.data);
             setEntries(entR.data);
             setPending(penR.data);
             setBalance(balR.data);
+            setLbcList(lbcR.data);
+            setCharges(chargesR.data);
+            setRevenues(revR.data);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
             setLbcPendingInput(String(balR.data.lbc_pending ?? 0));
@@ -117,15 +127,22 @@ export default function FinanceTab() {
     const addPending = async () => {
         if (!pendingForm.client_name || !pendingForm.amount) return;
         await axios.post(`${API}/finance/pending`, {
-            ...pendingForm,
+            client_name: pendingForm.client_name,
             amount: parseFloat(pendingForm.amount),
+            note: pendingForm.note || "",
+            category: pendingForm.category || "prestation",
         });
-        setPendingForm({ client_name: "", amount: "", note: "" });
+        setPendingForm({ client_name: "", amount: "", note: "", category: "prestation" });
         refresh();
     };
 
     const deletePending = async (id) => {
         await axios.delete(`${API}/finance/pending/${id}`);
+        refresh();
+    };
+
+    const confirmPending = async (id) => {
+        await axios.post(`${API}/finance/pending/${id}/confirm`);
         refresh();
     };
 
@@ -144,6 +161,42 @@ export default function FinanceTab() {
         refresh();
     };
 
+    const addCharge = async () => {
+        const amt = parseFloat(chargeForm.amount);
+        const day = parseInt(chargeForm.day_of_month, 10);
+        if (!chargeForm.label || !amt || !day || day < 1 || day > 31) return;
+        await axios.post(`${API}/finance/monthly-charges`, {
+            label: chargeForm.label,
+            amount: amt,
+            day_of_month: day,
+        });
+        setChargeForm({ label: "", amount: "", day_of_month: "" });
+        refresh();
+    };
+
+    const deleteCharge = async (id) => {
+        await axios.delete(`${API}/finance/monthly-charges/${id}`);
+        refresh();
+    };
+
+    const addRevenue = async () => {
+        const amt = parseFloat(revenueForm.amount);
+        const day = parseInt(revenueForm.day_of_month, 10);
+        if (!revenueForm.label || !amt || !day || day < 1 || day > 31) return;
+        await axios.post(`${API}/finance/recurring-revenues`, {
+            label: revenueForm.label,
+            amount: amt,
+            day_of_month: day,
+        });
+        setRevenueForm({ label: "", amount: "", day_of_month: "" });
+        refresh();
+    };
+
+    const deleteRevenue = async (id) => {
+        await axios.delete(`${API}/finance/recurring-revenues/${id}`);
+        refresh();
+    };
+
     const saveBalance = async () => {
         await axios.put(`${API}/finance/balance`, {
             balance: parseFloat(balanceInput) || 0,
@@ -156,12 +209,39 @@ export default function FinanceTab() {
     const cur = summary?.current;
     const prev = summary?.previous;
 
+    // Charges/revenus récurrents "à venir ce mois" = day_of_month >= jour courant
+    const todayDay = new Date().getDate();
+    const chargesUpcoming = useMemo(
+        () => charges.items.filter((c) => (c.day_of_month || 0) >= todayDay),
+        [charges.items, todayDay]
+    );
+    const revenuesUpcoming = useMemo(
+        () => revenues.items.filter((r) => (r.day_of_month || 0) >= todayDay),
+        [revenues.items, todayDay]
+    );
+    const chargesUpcomingTotal = useMemo(
+        () => chargesUpcoming.reduce((s, c) => s + (c.amount || 0), 0),
+        [chargesUpcoming]
+    );
+    const revenuesUpcomingTotal = useMemo(
+        () => revenuesUpcoming.reduce((s, r) => s + (r.amount || 0), 0),
+        [revenuesUpcoming]
+    );
+
     const projected = useMemo(() => {
         if (!cur) return 0;
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
-        return real + pending.total - cur.total_taxes - cb - lbcList.total;
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur]);
+        return (
+            real
+            + pending.total
+            + revenuesUpcomingTotal
+            - cur.total_taxes
+            - cb
+            - lbcList.total
+            - chargesUpcomingTotal
+        );
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal]);
 
     const CategoryPill = ({ value }) => {
         const map = {
@@ -431,8 +511,10 @@ export default function FinanceTab() {
                             <div className="space-y-2 text-[12px] font-mono pt-3 border-t border-[#333333]">
                                 <div className="flex justify-between"><span className="text-gray-400">Solde réel</span><span className="text-white">{fmt(parseFloat(balanceInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Différé CB</span><span className="text-red-400">−{fmt(parseFloat(cbDeferredInput) || 0)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Taxes du mois</span><span className="text-red-400">−{fmt(cur.total_taxes)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
@@ -542,13 +624,23 @@ export default function FinanceTab() {
                             placeholder="Montant €"
                             className="col-span-4 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-green-400 text-sm font-mono font-bold focus:outline-none"
                         />
+                        <select
+                            data-testid="pending-category"
+                            value={pendingForm.category}
+                            onChange={(e) => setPendingForm({ ...pendingForm, category: e.target.value })}
+                            className="col-span-3 h-11 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-[11px] font-mono focus:outline-none"
+                        >
+                            <option value="prestation">Prestation</option>
+                            <option value="materiel">Matériel</option>
+                            <option value="formation">Formation</option>
+                        </select>
                         <button
                             data-testid="pending-add"
                             onClick={addPending}
-                            className="col-span-3 h-11 bg-green-600 hover:bg-green-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                            className="col-span-12 h-10 bg-green-600 hover:bg-green-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
                         >
                             <Plus className="h-3.5 w-3.5" />
-                            Ajouter
+                            Ajouter en attente
                         </button>
                     </div>
 
@@ -566,13 +658,23 @@ export default function FinanceTab() {
                                 >
                                     <div className="flex flex-col min-w-0 flex-1">
                                         <span className="text-sm text-white truncate">{p.client_name}</span>
-                                        {p.note && (
-                                            <span className="text-[10px] text-gray-500 truncate">{p.note}</span>
-                                        )}
+                                        <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono">
+                                            {p.category || "prestation"}
+                                        </span>
                                     </div>
                                     <span className="font-mono text-sm font-bold text-green-400 shrink-0">
                                         {fmt(p.amount)} €
                                     </span>
+                                    <button
+                                        data-testid={`pending-confirm-${p.id}`}
+                                        onClick={() => confirmPending(p.id)}
+                                        className="flex items-center gap-1 px-2 h-7 bg-green-600 hover:bg-green-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
+                                        aria-label="Encaisser"
+                                        title="Virement reçu : convertir en CA"
+                                    >
+                                        <Check className="h-3 w-3" />
+                                        Encaisser
+                                    </button>
                                     <button
                                         data-testid={`pending-delete-${p.id}`}
                                         onClick={() => deletePending(p.id)}
@@ -583,6 +685,183 @@ export default function FinanceTab() {
                                     </button>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                </SectionCard>
+            </div>
+
+            {/* Charges mensuelles + Abonnements clients récurrents */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Prélèvements mensuels */}
+                <SectionCard>
+                    <SectionTitle icon={ArrowUpFromLine} accent="text-red-400">
+                        Prélèvements mensuels · {fmt(charges.total)} €
+                    </SectionTitle>
+                    <p className="text-[10px] text-gray-500 font-mono mb-3">
+                        Free, Matmut, assurances… — déduits du prévisionnel du mois
+                    </p>
+                    <div className="grid grid-cols-12 gap-2 mb-3">
+                        <input
+                            data-testid="charge-label"
+                            type="text"
+                            value={chargeForm.label}
+                            onChange={(e) => setChargeForm({ ...chargeForm, label: e.target.value })}
+                            placeholder="Ex: Free box"
+                            className="col-span-6 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-red-500 text-white text-sm focus:outline-none"
+                        />
+                        <input
+                            data-testid="charge-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={chargeForm.amount}
+                            onChange={(e) => setChargeForm({ ...chargeForm, amount: e.target.value })}
+                            placeholder="€"
+                            className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-red-500 text-red-300 text-sm font-mono focus:outline-none"
+                        />
+                        <input
+                            data-testid="charge-day"
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={chargeForm.day_of_month}
+                            onChange={(e) => setChargeForm({ ...chargeForm, day_of_month: e.target.value })}
+                            placeholder="Jour"
+                            className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-red-500 text-gray-300 text-sm font-mono focus:outline-none"
+                        />
+                        <button
+                            data-testid="charge-add"
+                            onClick={addCharge}
+                            className="col-span-12 h-9 bg-red-600 hover:bg-red-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Ajouter un prélèvement
+                        </button>
+                    </div>
+
+                    {charges.items.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
+                            Aucun prélèvement enregistré
+                        </p>
+                    ) : (
+                        <div className="space-y-1 max-h-60 overflow-y-auto">
+                            {charges.items.map((c) => {
+                                const upcoming = (c.day_of_month || 0) >= todayDay;
+                                return (
+                                    <div
+                                        key={c.id}
+                                        data-testid={`charge-item-${c.id}`}
+                                        className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                    >
+                                        <span className={`font-mono text-[10px] w-8 text-center ${upcoming ? "text-red-400" : "text-gray-600"}`}>
+                                            {String(c.day_of_month).padStart(2, "0")}
+                                        </span>
+                                        <span className="flex-1 text-sm text-white truncate">{c.label}</span>
+                                        <span className={`font-mono text-sm font-bold shrink-0 ${upcoming ? "text-red-400" : "text-gray-500 line-through"}`}>
+                                            {fmt(c.amount)} €
+                                        </span>
+                                        <button
+                                            data-testid={`charge-delete-${c.id}`}
+                                            onClick={() => deleteCharge(c.id)}
+                                            className="text-gray-500 hover:text-red-500 transition-colors"
+                                            aria-label="Supprimer"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                            <div className="flex justify-between pt-2 text-[11px] font-mono">
+                                <span className="text-gray-400 uppercase tracking-wider text-[10px]">À venir ce mois</span>
+                                <span className="text-red-400 font-bold">−{fmt(chargesUpcomingTotal)} €</span>
+                            </div>
+                        </div>
+                    )}
+                </SectionCard>
+
+                {/* Abonnements clients récurrents */}
+                <SectionCard>
+                    <SectionTitle icon={ArrowDownToLine} accent="text-green-400">
+                        Abonnements clients · {fmt(revenues.total)} €
+                    </SectionTitle>
+                    <p className="text-[10px] text-gray-500 font-mono mb-3">
+                        Revenus récurrents (SOMNUM, JLP…) — ajoutés au prévisionnel
+                    </p>
+                    <div className="grid grid-cols-12 gap-2 mb-3">
+                        <input
+                            data-testid="revenue-label"
+                            type="text"
+                            value={revenueForm.label}
+                            onChange={(e) => setRevenueForm({ ...revenueForm, label: e.target.value })}
+                            placeholder="Nom client"
+                            className="col-span-6 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-green-500 text-white text-sm focus:outline-none"
+                        />
+                        <input
+                            data-testid="revenue-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={revenueForm.amount}
+                            onChange={(e) => setRevenueForm({ ...revenueForm, amount: e.target.value })}
+                            placeholder="€"
+                            className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-green-500 text-green-400 text-sm font-mono focus:outline-none"
+                        />
+                        <input
+                            data-testid="revenue-day"
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={revenueForm.day_of_month}
+                            onChange={(e) => setRevenueForm({ ...revenueForm, day_of_month: e.target.value })}
+                            placeholder="Jour"
+                            className="col-span-3 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-green-500 text-gray-300 text-sm font-mono focus:outline-none"
+                        />
+                        <button
+                            data-testid="revenue-add"
+                            onClick={addRevenue}
+                            className="col-span-12 h-9 bg-green-600 hover:bg-green-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Ajouter un abonnement
+                        </button>
+                    </div>
+
+                    {revenues.items.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
+                            Aucun abonnement enregistré
+                        </p>
+                    ) : (
+                        <div className="space-y-1 max-h-60 overflow-y-auto">
+                            {revenues.items.map((r) => {
+                                const upcoming = (r.day_of_month || 0) >= todayDay;
+                                return (
+                                    <div
+                                        key={r.id}
+                                        data-testid={`revenue-item-${r.id}`}
+                                        className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                    >
+                                        <span className={`font-mono text-[10px] w-8 text-center ${upcoming ? "text-green-400" : "text-gray-600"}`}>
+                                            {String(r.day_of_month).padStart(2, "0")}
+                                        </span>
+                                        <span className="flex-1 text-sm text-white truncate">{r.label}</span>
+                                        <span className={`font-mono text-sm font-bold shrink-0 ${upcoming ? "text-green-400" : "text-gray-500 line-through"}`}>
+                                            {fmt(r.amount)} €
+                                        </span>
+                                        <button
+                                            data-testid={`revenue-delete-${r.id}`}
+                                            onClick={() => deleteRevenue(r.id)}
+                                            className="text-gray-500 hover:text-red-500 transition-colors"
+                                            aria-label="Supprimer"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                            <div className="flex justify-between pt-2 text-[11px] font-mono">
+                                <span className="text-gray-400 uppercase tracking-wider text-[10px]">À venir ce mois</span>
+                                <span className="text-green-400 font-bold">+{fmt(revenuesUpcomingTotal)} €</span>
+                            </div>
                         </div>
                     )}
                 </SectionCard>
