@@ -59,6 +59,8 @@ export default function FinanceTab() {
     const [lbcList, setLbcList] = useState({ items: [], total: 0 });
     const [charges, setCharges] = useState({ items: [], total: 0 });
     const [revenues, setRevenues] = useState({ items: [], total: 0 });
+    const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
+    const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [balance, setBalance] = useState({ balance: 0, cb_deferred: 0, lbc_pending: 0, updated_at: "" });
     const [loading, setLoading] = useState(true);
 
@@ -74,6 +76,8 @@ export default function FinanceTab() {
     const [lbcForm, setLbcForm] = useState({ label: "", amount: "" });
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
+    const [prepareForm, setPrepareForm] = useState({ label: "", amount: "", note: "" });
+    const [stockForm, setStockForm] = useState({ label: "", kind: "fixe", quantity: "1", unit_value: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
     const [lbcPendingInput, setLbcPendingInput] = useState("");
@@ -81,7 +85,7 @@ export default function FinanceTab() {
     const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumR, entR, penR, balR, lbcR, chargesR, revR] = await Promise.all([
+            const [sumR, entR, penR, balR, lbcR, chargesR, revR, prepR, stockR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
@@ -89,6 +93,8 @@ export default function FinanceTab() {
                 axios.get(`${API}/finance/lbc-purchases`),
                 axios.get(`${API}/finance/monthly-charges`),
                 axios.get(`${API}/finance/recurring-revenues`),
+                axios.get(`${API}/finance/payments-to-prepare`),
+                axios.get(`${API}/finance/stock`),
             ]);
             setSummary(sumR.data);
             setEntries(entR.data);
@@ -97,6 +103,8 @@ export default function FinanceTab() {
             setLbcList(lbcR.data);
             setCharges(chargesR.data);
             setRevenues(revR.data);
+            setToPrepare(prepR.data);
+            setStock(stockR.data);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
             setLbcPendingInput(String(balR.data.lbc_pending ?? 0));
@@ -195,6 +203,39 @@ export default function FinanceTab() {
 
     const deleteRevenue = async (id) => {
         await axios.delete(`${API}/finance/recurring-revenues/${id}`);
+        refresh();
+    };
+
+    const addPrepare = async () => {
+        if (!prepareForm.label) return;
+        await axios.post(`${API}/finance/payments-to-prepare`, {
+            label: prepareForm.label,
+            amount: parseFloat(prepareForm.amount) || 0,
+            note: prepareForm.note || "",
+        });
+        setPrepareForm({ label: "", amount: "", note: "" });
+        refresh();
+    };
+
+    const deletePrepare = async (id) => {
+        await axios.delete(`${API}/finance/payments-to-prepare/${id}`);
+        refresh();
+    };
+
+    const addStock = async () => {
+        if (!stockForm.label) return;
+        await axios.post(`${API}/finance/stock`, {
+            label: stockForm.label,
+            kind: stockForm.kind,
+            quantity: parseInt(stockForm.quantity, 10) || 1,
+            unit_value: parseFloat(stockForm.unit_value) || 0,
+        });
+        setStockForm({ label: "", kind: "fixe", quantity: "1", unit_value: "" });
+        refresh();
+    };
+
+    const deleteStock = async (id) => {
+        await axios.delete(`${API}/finance/stock/${id}`);
         refresh();
     };
 
@@ -880,6 +921,181 @@ export default function FinanceTab() {
                                 <span className="text-gray-400 uppercase tracking-wider text-[10px]">À venir ce mois</span>
                                 <span className="text-green-400 font-bold">+{fmt(revenuesUpcomingTotal)} €</span>
                             </div>
+                        </div>
+                    )}
+                </SectionCard>
+            </div>
+
+            {/* Paiements à préparer + Stock réel */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Paiements à préparer */}
+                <SectionCard>
+                    <SectionTitle icon={FileCheck2} accent="text-yellow-400">
+                        Paiements à préparer · {toPrepare.count || toPrepare.items.length}
+                        {toPrepare.total > 0 && ` · ${fmt(toPrepare.total)} €`}
+                    </SectionTitle>
+                    <p className="text-[10px] text-gray-500 font-mono mb-3">
+                        Devis à envoyer / factures à émettre — pour mémoire
+                    </p>
+                    <div className="grid grid-cols-12 gap-2 mb-3">
+                        <input
+                            data-testid="prepare-label"
+                            type="text"
+                            value={prepareForm.label}
+                            onChange={(e) => setPrepareForm({ ...prepareForm, label: e.target.value })}
+                            placeholder="Client + objet (ex: LUKADHESIF — nouveau PC)"
+                            className="col-span-8 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                        />
+                        <input
+                            data-testid="prepare-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={prepareForm.amount}
+                            onChange={(e) => setPrepareForm({ ...prepareForm, amount: e.target.value })}
+                            placeholder="€ (optionnel)"
+                            className="col-span-4 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-300 text-sm font-mono focus:outline-none"
+                        />
+                        <button
+                            data-testid="prepare-add"
+                            onClick={addPrepare}
+                            className="col-span-12 h-9 bg-yellow-600 hover:bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Ajouter un devis à préparer
+                        </button>
+                    </div>
+
+                    {toPrepare.items.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
+                            Aucun devis à préparer
+                        </p>
+                    ) : (
+                        <div className="space-y-1 max-h-60 overflow-y-auto">
+                            {toPrepare.items.map((p) => (
+                                <div
+                                    key={p.id}
+                                    data-testid={`prepare-item-${p.id}`}
+                                    className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                >
+                                    <span className="flex-1 text-sm text-white truncate">{p.label}</span>
+                                    {p.amount > 0 && (
+                                        <span className="font-mono text-sm font-bold text-yellow-300 shrink-0">
+                                            {fmt(p.amount)} €
+                                        </span>
+                                    )}
+                                    <button
+                                        data-testid={`prepare-delete-${p.id}`}
+                                        onClick={() => deletePrepare(p.id)}
+                                        className="text-gray-500 hover:text-red-500 transition-colors"
+                                        aria-label="Supprimer"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </SectionCard>
+
+                {/* Stock réel */}
+                <SectionCard>
+                    <SectionTitle icon={Wallet} accent="text-purple-400">
+                        Stock réel · {stock.fixes + stock.portables} pc · {fmt(stock.total_value)} €
+                    </SectionTitle>
+                    <p className="text-[10px] text-gray-500 font-mono mb-3">
+                        Pour info — n'affecte ni le CA ni le prévisionnel
+                    </p>
+                    <div className="grid grid-cols-12 gap-2 mb-3">
+                        <input
+                            data-testid="stock-label"
+                            type="text"
+                            value={stockForm.label}
+                            onChange={(e) => setStockForm({ ...stockForm, label: e.target.value })}
+                            placeholder="Modèle (ex: Dell Latitude 5500)"
+                            className="col-span-7 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-white text-sm focus:outline-none"
+                        />
+                        <select
+                            data-testid="stock-kind"
+                            value={stockForm.kind}
+                            onChange={(e) => setStockForm({ ...stockForm, kind: e.target.value })}
+                            className="col-span-5 h-10 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
+                        >
+                            <option value="fixe">PC Fixe</option>
+                            <option value="portable">Portable</option>
+                        </select>
+                        <input
+                            data-testid="stock-qty"
+                            type="number"
+                            min="1"
+                            value={stockForm.quantity}
+                            onChange={(e) => setStockForm({ ...stockForm, quantity: e.target.value })}
+                            placeholder="Qté"
+                            className="col-span-4 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-gray-300 text-sm font-mono focus:outline-none"
+                        />
+                        <input
+                            data-testid="stock-unit-value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={stockForm.unit_value}
+                            onChange={(e) => setStockForm({ ...stockForm, unit_value: e.target.value })}
+                            placeholder="Valeur unit. €"
+                            className="col-span-8 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-purple-300 text-sm font-mono focus:outline-none"
+                        />
+                        <button
+                            data-testid="stock-add"
+                            onClick={addStock}
+                            className="col-span-12 h-9 bg-purple-600 hover:bg-purple-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
+                        >
+                            <Plus className="h-3 w-3" />
+                            Ajouter au stock
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">PC Fixes</div>
+                            <div className="font-mono text-lg font-bold text-purple-300">{stock.fixes}</div>
+                        </div>
+                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Portables</div>
+                            <div className="font-mono text-lg font-bold text-purple-300">{stock.portables}</div>
+                        </div>
+                    </div>
+
+                    {stock.items.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
+                            Stock vide
+                        </p>
+                    ) : (
+                        <div className="space-y-1 max-h-60 overflow-y-auto">
+                            {stock.items.map((s) => (
+                                <div
+                                    key={s.id}
+                                    data-testid={`stock-item-${s.id}`}
+                                    className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                >
+                                    <span className="text-[9px] tracking-[0.15em] uppercase font-mono text-purple-400 w-14 shrink-0">
+                                        {s.kind === "portable" ? "PORT." : "FIXE"}
+                                    </span>
+                                    <span className="flex-1 text-sm text-white truncate">{s.label}</span>
+                                    <span className="font-mono text-[11px] text-gray-400 shrink-0">
+                                        ×{s.quantity}
+                                    </span>
+                                    <span className="font-mono text-sm font-bold text-purple-300 shrink-0">
+                                        {fmt(s.quantity * s.unit_value)} €
+                                    </span>
+                                    <button
+                                        data-testid={`stock-delete-${s.id}`}
+                                        onClick={() => deleteStock(s.id)}
+                                        className="text-gray-500 hover:text-red-500 transition-colors"
+                                        aria-label="Supprimer"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </SectionCard>

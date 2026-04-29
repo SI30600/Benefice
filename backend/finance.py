@@ -106,6 +106,42 @@ class RecurringRevenueCreate(BaseModel):
     prepaid: bool = False
 
 
+# ---- Payments to prepare (devis à envoyer, factures à émettre) -------------
+
+class PaymentToPrepare(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    label: str         # ex: "LUKADHESIF (nouveau PC)"
+    amount: float = 0  # estimation, peut être 0 si pas encore chiffré
+    note: str = ""
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class PaymentToPrepareCreate(BaseModel):
+    label: str
+    amount: float = 0
+    note: str = ""
+
+
+# ---- Stock inventory (informationnel, ne rentre pas dans le chiffre) -------
+
+class StockItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    label: str
+    kind: str = "fixe"  # "fixe" ou "portable"
+    quantity: int = 1
+    unit_value: float = 0
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class StockItemCreate(BaseModel):
+    label: str
+    kind: str = "fixe"
+    quantity: int = 1
+    unit_value: float = 0
+
+
 class AccountBalance(BaseModel):
     balance: float = 0
     cb_deferred: float = 0

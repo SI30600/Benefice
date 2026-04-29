@@ -17,6 +17,8 @@ from finance import (
     LbcPurchase, LbcPurchaseCreate,
     MonthlyCharge, MonthlyChargeCreate,
     RecurringRevenue, RecurringRevenueCreate,
+    PaymentToPrepare, PaymentToPrepareCreate,
+    StockItem, StockItemCreate,
 )
 from portal_auth import (
     build_portal_auth_url, exchange_code as portal_exchange_code,
@@ -330,6 +332,63 @@ async def delete_recurring_revenue(revenue_id: str, _=Depends(require_auth)):
     res = await db.recurring_revenues.delete_one({"id": revenue_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Abonnement introuvable")
+    return {"deleted": True}
+
+
+# ---- Finance: payments to prepare ------------------------------------------
+
+@api_router.post("/finance/payments-to-prepare", response_model=PaymentToPrepare)
+async def create_payment_to_prepare(payload: PaymentToPrepareCreate, _=Depends(require_auth)):
+    item = PaymentToPrepare(**payload.model_dump())
+    await db.payments_to_prepare.insert_one(item.model_dump())
+    return item
+
+
+@api_router.get("/finance/payments-to-prepare")
+async def list_payments_to_prepare(_=Depends(require_auth)):
+    rows = await db.payments_to_prepare.find({}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    total = round(sum(r.get("amount", 0) for r in rows), 2)
+    return {"items": rows, "total": total, "count": len(rows)}
+
+
+@api_router.delete("/finance/payments-to-prepare/{payment_id}")
+async def delete_payment_to_prepare(payment_id: str, _=Depends(require_auth)):
+    res = await db.payments_to_prepare.delete_one({"id": payment_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
+    return {"deleted": True}
+
+
+# ---- Finance: stock items --------------------------------------------------
+
+@api_router.post("/finance/stock", response_model=StockItem)
+async def create_stock_item(payload: StockItemCreate, _=Depends(require_auth)):
+    item = StockItem(**payload.model_dump())
+    await db.stock_items.insert_one(item.model_dump())
+    return item
+
+
+@api_router.get("/finance/stock")
+async def list_stock_items(_=Depends(require_auth)):
+    rows = await db.stock_items.find({}, {"_id": 0}).sort("kind", 1).to_list(500)
+    total_value = round(sum((r.get("quantity", 0) * r.get("unit_value", 0)) for r in rows), 2)
+    total_qty = sum(r.get("quantity", 0) for r in rows)
+    fixes = sum(r.get("quantity", 0) for r in rows if r.get("kind") == "fixe")
+    portables = sum(r.get("quantity", 0) for r in rows if r.get("kind") == "portable")
+    return {
+        "items": rows,
+        "total_value": total_value,
+        "total_quantity": total_qty,
+        "fixes": fixes,
+        "portables": portables,
+    }
+
+
+@api_router.delete("/finance/stock/{item_id}")
+async def delete_stock_item(item_id: str, _=Depends(require_auth)):
+    res = await db.stock_items.delete_one({"id": item_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Article introuvable")
     return {"deleted": True}
 
 
