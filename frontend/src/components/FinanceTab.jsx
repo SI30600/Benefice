@@ -633,10 +633,9 @@ export default function FinanceTab() {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
                                 <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
                                 <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
-                                <StatBox label="Dépenses" value={cur.achats || 0} color="text-red-400" testid="total-depenses" sub="coûts directs" />
                             </div>
                             <div className="grid grid-cols-2 gap-2 mt-2">
                                 <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-ventes">
@@ -916,10 +915,8 @@ export default function FinanceTab() {
                                 onChange={(e) => setEntryForm({ ...entryForm, category: e.target.value })}
                                 className="h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
                             >
-                                <option value="prestation">Prestation (revenu)</option>
-                                <option value="materiel">Matériel (revenu)</option>
-                                <option value="formation">Formation (revenu)</option>
-                                <option value="achat">Dépense (coût / sous-traitance)</option>
+                                <option value="prestation">Prestation</option>
+                                <option value="materiel">Matériel</option>
                             </select>
                         </div>
 
@@ -994,7 +991,6 @@ export default function FinanceTab() {
                         >
                             <option value="prestation">Prestation</option>
                             <option value="materiel">Matériel</option>
-                            <option value="formation">Formation</option>
                         </select>
                         <button
                             data-testid="pending-add"
