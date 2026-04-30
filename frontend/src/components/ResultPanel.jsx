@@ -122,20 +122,6 @@ export default function ResultPanel({ calc, itemName }) {
                 />
             </div>
 
-            {/* Gross profit */}
-            <div className="flex items-center justify-between mb-6 font-mono text-xs">
-                <span className="tracking-[0.2em] uppercase text-gray-500">
-                    Bénéfice brut
-                </span>
-                <span
-                    data-testid="gross-profit"
-                    className={`text-base ${calc.grossProfit >= 0 ? "text-gray-200" : "text-red-400"}`}
-                >
-                    {calc.grossProfit >= 0 ? "+" : ""}
-                    {fmt(calc.grossProfit)} €
-                </span>
-            </div>
-
             {/* Net profit hero */}
             <div className="border-t border-[#333333] pt-6">
                 <div className="flex items-center justify-between mb-2">
