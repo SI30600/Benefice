@@ -76,6 +76,10 @@ Application de calcul de bénéfice net pour revente de pièces informatiques + 
 - Auth portail O365 mono-tenant (backend + frontend)
 - Suppression complète du code OneDrive obsolète
 - Toutes les requêtes axios injectent le bearer token via `axios.defaults`
+- **2026-04-30** : Calcul rapide multi-articles (panier d'achats multi-sources) — testé E2E
+- **2026-04-30** : Plateforme "Autre" avec taxe + frais expédition manuels — testé E2E
+- **2026-04-30** : Placeholders "prix mini" transparents (CalcForm + AssemblyForm) couvrant achat + taxe + URSSAF 13.5% — testé E2E
+- **2026-04-30** : ResultPanel — libellé "Taxes plateformes" (LBC 5% + Autre) et "Livraison" agrégée (zone + expédition custom)
 
 ### 🚧 Configuration Azure requise
 - App registration en single-tenant

@@ -92,21 +92,25 @@ export default function ResultPanel({ calc, itemName }) {
                     sign="−"
                     color="text-gray-300"
                 />
-                <Row
-                    testid="row-lbc"
-                    label="Taxe Leboncoin (5%)"
-                    value={calc.lbcTax}
-                    sign="−"
-                    color="text-orange-400"
-                    accent="#F97316"
-                />
+                {calc.lbcTax > 0 && (
+                    <Row
+                        testid="row-lbc"
+                        label="Taxes plateformes"
+                        value={calc.lbcTax}
+                        sign="−"
+                        color="text-orange-400"
+                        accent="#F97316"
+                        hint="LBC 5% + Autre"
+                    />
+                )}
                 <Row
                     testid="row-delivery"
                     label="Livraison"
-                    value={calc.delivery}
+                    value={calc.delivery + (calc.customShipping || 0)}
                     sign="−"
                     color="text-yellow-400"
                     accent="#EAB308"
+                    hint={calc.customShipping > 0 ? `zone + expédition` : undefined}
                 />
                 <Row
                     testid="row-urssaf"
