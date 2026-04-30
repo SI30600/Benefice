@@ -72,19 +72,25 @@ export default function Calculator() {
         const deliveryObj = TRAVEL_OPTIONS.find((t) => t.key === values.deliveryZone);
         const delivery = deliveryObj?.price || 0;
         const deliveryLabel = deliveryObj?.label || "";
-        // Taxe 5% sur achats LBC uniquement (par article)
-        const lbcTax = +items.reduce(
-            (s, it) => s + (it.platform === "leboncoin" ? (parseFloat(it.purchasePrice) || 0) * 0.05 : 0),
+        // Taxe par article : Leboncoin = 5% auto, "autre" = customTax saisi, sinon 0
+        const lbcTax = +items.reduce((s, it) => {
+            if (it.platform === "leboncoin") return s + (parseFloat(it.purchasePrice) || 0) * 0.05;
+            if (it.platform === "autre") return s + (parseFloat(it.customTax) || 0);
+            return s;
+        }, 0).toFixed(2);
+        // Livraisons custom (pour les articles "autre" qui ont leur propre frais d'expédition)
+        const customShipping = +items.reduce(
+            (s, it) => s + (it.platform === "autre" ? (parseFloat(it.customShipping) || 0) : 0),
             0
         ).toFixed(2);
         const urssaf = +(sale * RATE_ARTICLE).toFixed(2);
-        const totalCosts = +(purchase + lbcTax + delivery + urssaf).toFixed(2);
+        const totalCosts = +(purchase + lbcTax + customShipping + delivery + urssaf).toFixed(2);
         const grossProfit = +(sale - purchase).toFixed(2);
         const netProfit = +(sale - totalCosts).toFixed(2);
         const margin = sale > 0 ? +((netProfit / sale) * 100).toFixed(1) : 0;
         const roi = purchase > 0 ? +((netProfit / purchase) * 100).toFixed(1) : 0;
         return {
-            purchase, sale, delivery, deliveryLabel, lbcTax, urssaf,
+            purchase, sale, delivery, deliveryLabel, lbcTax, customShipping, urssaf,
             totalCosts, grossProfit, netProfit, margin, roi,
             itemsCount: items.length,
             hasData: sale > 0 || purchase > 0,

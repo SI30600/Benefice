@@ -49,8 +49,31 @@ const TravelButton = ({ option, active, onClick }) => (
     </button>
 );
 
+// Taux URSSAF + impôt + CFP pour articles (vente de marchandise)
+const ARTICLE_RATE = 0.135; // 12.3% URSSAF + 1% impôt + 0.2% CFP
+
+// Seuil minimum de revente pour ne pas perdre d'argent sur cet article
+// Sale × (1 - RATE) >= achat + taxeLBC  =>  Sale >= (achat + taxeLBC) / (1 - RATE)
+const computeMinSale = (purchasePrice, platform) => {
+    const purchase = parseFloat(purchasePrice) || 0;
+    if (purchase <= 0) return 0;
+    const lbcTax = platform === "leboncoin" ? purchase * 0.05 : 0;
+    return Math.ceil(((purchase + lbcTax) / (1 - ARTICLE_RATE)) * 100) / 100;
+};
+
 const ItemRow = ({ item, index, total, onChange, onRemove }) => {
     const update = (key) => (e) => onChange(index, { ...item, [key]: e.target.value });
+    const isOther = item.platform === "autre";
+    const purchase = parseFloat(item.purchasePrice) || 0;
+    // Pour le seuil min : Leboncoin = 5% auto, "autre" = taxe manuelle saisie, sinon 0
+    let extraCosts = 0;
+    if (item.platform === "leboncoin") extraCosts = purchase * 0.05;
+    else if (isOther) {
+        extraCosts = (parseFloat(item.customTax) || 0) + (parseFloat(item.customShipping) || 0);
+    }
+    const minSale = purchase > 0
+        ? Math.ceil(((purchase + extraCosts) / (1 - ARTICLE_RATE)) * 100) / 100
+        : 0;
     return (
         <div
             data-testid={`quick-item-${index}`}
@@ -132,12 +155,67 @@ const ItemRow = ({ item, index, total, onChange, onRemove }) => {
                         min="0"
                         value={item.salePrice}
                         onChange={update("salePrice")}
-                        placeholder="Prix vente"
-                        className="w-full h-11 px-3 pr-10 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-green-400 text-base font-mono font-semibold focus:outline-none"
+                        placeholder={minSale > 0 ? `min ${minSale} €` : "Prix vente"}
+                        className="w-full h-11 px-3 pr-10 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-green-400 text-base font-mono font-semibold focus:outline-none placeholder:text-yellow-500/40 placeholder:italic"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm">€</span>
                 </div>
             </div>
+            {minSale > 0 && (
+                <div className="text-[10px] font-mono text-gray-500 -mt-1">
+                    {(parseFloat(item.salePrice) || 0) >= minSale ? (
+                        <span className="text-green-400">
+                            ✓ rentable — seuil minimum {minSale} € (couvre achat + taxe + URSSAF 13,5%)
+                        </span>
+                    ) : (
+                        <span className="text-yellow-500/80">
+                            ⚠ seuil minimum {minSale} € pour couvrir achat + taxe + URSSAF 13,5%
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Champs custom si plateforme = "Autre" */}
+            {isOther && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-[#1f1f1f]">
+                    <div>
+                        <label className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 mb-1 block">
+                            Taxe / commission (€)
+                        </label>
+                        <div className="relative">
+                            <input
+                                data-testid={`quick-item-customtax-${index}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.customTax || ""}
+                                onChange={update("customTax")}
+                                placeholder="0.00"
+                                className="w-full h-10 px-3 pr-8 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-300 text-sm font-mono focus:outline-none"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs">€</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 mb-1 block">
+                            Frais livraison / expédition (€)
+                        </label>
+                        <div className="relative">
+                            <input
+                                data-testid={`quick-item-customship-${index}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.customShipping || ""}
+                                onChange={update("customShipping")}
+                                placeholder="0.00"
+                                className="w-full h-10 px-3 pr-8 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-300 text-sm font-mono focus:outline-none"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs">€</span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -149,6 +227,8 @@ export default function CalcForm({ values, setValues, travelOptions = [] }) {
         platform: "leboncoin",
         purchasePrice: "",
         salePrice: "",
+        customTax: "",
+        customShipping: "",
     });
 
     const updateItem = (index, newItem) => {
@@ -274,8 +354,7 @@ export default function CalcForm({ values, setValues, travelOptions = [] }) {
                             date: new Date().toISOString().slice(0, 10),
                             items: [blankItem()],
                             deliveryZone: "vauvert",
-                        })
-                    }
+                        })                    }
                     className="mt-2 inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase font-mono text-gray-500 hover:text-yellow-500 transition-colors"
                 >
                     <span className="h-px w-6 bg-current" />

@@ -35,7 +35,16 @@ const Toggle = ({ active, onClick, children, testid }) => (
     </button>
 );
 
-const ComponentRow = ({ label, icon: Icon, value, onChange, testid }) => (
+const ARTICLE_RATE = 0.135;
+const computeMinSale = (cost) => {
+    const c = parseFloat(cost) || 0;
+    if (c <= 0) return 0;
+    return Math.ceil((c / (1 - ARTICLE_RATE)) * 100) / 100;
+};
+
+const ComponentRow = ({ label, icon: Icon, value, onChange, testid }) => {
+    const minSale = computeMinSale(value.cost);
+    return (
     <div className="grid grid-cols-12 gap-2 items-center">
         <div className="col-span-3 flex items-center gap-2 min-w-0 px-1">
             {Icon && <Icon className="h-3.5 w-3.5 text-gray-500 shrink-0" />}
@@ -79,14 +88,16 @@ const ComponentRow = ({ label, icon: Icon, value, onChange, testid }) => (
                     min="0"
                     value={value.sale}
                     onChange={(e) => onChange({ ...value, sale: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full h-10 px-3 pr-7 bg-transparent text-yellow-500 text-sm font-mono font-semibold focus:outline-none placeholder:text-gray-700"
+                    placeholder={minSale > 0 ? `min ${minSale}` : "0.00"}
+                    title={minSale > 0 ? `Seuil minimum ${minSale} € (couvre coût + URSSAF 13,5%)` : ""}
+                    className="w-full h-10 px-3 pr-7 bg-transparent text-yellow-500 text-sm font-mono font-semibold focus:outline-none placeholder:text-yellow-500/40 placeholder:italic"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-xs">€</span>
             </InputBox>
         </div>
     </div>
-);
+    );
+};
 
 const TravelButton = ({ option, active, onClick }) => (
     <button
