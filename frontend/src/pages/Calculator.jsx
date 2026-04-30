@@ -50,23 +50,33 @@ const blankComponents = (list) =>
 export default function Calculator() {
     const [mode, setMode] = useState("quick");
 
-    // Quick calculator (articles → 13%)
-    const [values, setValues] = useState({
+    // Quick calculator (articles multi-achats → 13%)
+    const blankItem = () => ({
+        id: Math.random().toString(36).slice(2, 10),
         itemName: "",
-        date: new Date().toISOString().slice(0, 10),
         platform: "leboncoin",
         purchasePrice: "",
         salePrice: "",
+    });
+
+    const [values, setValues] = useState({
+        date: new Date().toISOString().slice(0, 10),
+        items: [blankItem()],
         deliveryZone: "vauvert",
     });
 
     const calc = useMemo(() => {
-        const purchase = parseFloat(values.purchasePrice) || 0;
-        const sale = parseFloat(values.salePrice) || 0;
+        const items = values.items || [];
+        const purchase = +items.reduce((s, it) => s + (parseFloat(it.purchasePrice) || 0), 0).toFixed(2);
+        const sale = +items.reduce((s, it) => s + (parseFloat(it.salePrice) || 0), 0).toFixed(2);
         const deliveryObj = TRAVEL_OPTIONS.find((t) => t.key === values.deliveryZone);
         const delivery = deliveryObj?.price || 0;
         const deliveryLabel = deliveryObj?.label || "";
-        const lbcTax = +(purchase * 0.05).toFixed(2);
+        // Taxe 5% sur achats LBC uniquement (par article)
+        const lbcTax = +items.reduce(
+            (s, it) => s + (it.platform === "leboncoin" ? (parseFloat(it.purchasePrice) || 0) * 0.05 : 0),
+            0
+        ).toFixed(2);
         const urssaf = +(sale * RATE_ARTICLE).toFixed(2);
         const totalCosts = +(purchase + lbcTax + delivery + urssaf).toFixed(2);
         const grossProfit = +(sale - purchase).toFixed(2);
@@ -76,6 +86,7 @@ export default function Calculator() {
         return {
             purchase, sale, delivery, deliveryLabel, lbcTax, urssaf,
             totalCosts, grossProfit, netProfit, margin, roi,
+            itemsCount: items.length,
             hasData: sale > 0 || purchase > 0,
         };
     }, [values]);
@@ -270,7 +281,7 @@ export default function Calculator() {
                             />
                         </div>
                         <div className="lg:col-span-5 lg:sticky lg:top-8">
-                            <ResultPanel calc={calc} itemName={values.itemName} />
+                            <ResultPanel calc={calc} itemName={(values.items || []).map((i) => i.itemName).filter(Boolean).join(" + ") || `${calc.itemsCount} article${calc.itemsCount > 1 ? "s" : ""}`} />
                         </div>
                     </div>
                 ) : (

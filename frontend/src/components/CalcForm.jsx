@@ -1,4 +1,4 @@
-import { Box, Calendar as CalendarIcon, Tag, Truck, ArrowDownToLine, ArrowUpFromLine, MapPin } from "lucide-react";
+import { Box, Calendar as CalendarIcon, Tag, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, MapPin } from "lucide-react";
 import {
     Select,
     SelectContent,
@@ -8,13 +8,14 @@ import {
 } from "@/components/ui/select";
 
 const PLATFORMS = [
-    { value: "leboncoin", label: "Leboncoin" },
+    { value: "leboncoin", label: "Leboncoin (taxe 5%)" },
     { value: "vinted", label: "Vinted" },
     { value: "ebay", label: "eBay" },
     { value: "rakuten", label: "Rakuten" },
     { value: "amazon", label: "Amazon" },
     { value: "facebook", label: "Facebook Marketplace" },
     { value: "particulier", label: "Particulier (main à main)" },
+    { value: "magasin", label: "Magasin (Boulanger, Cdiscount…)" },
     { value: "autre", label: "Autre" },
 ];
 
@@ -23,12 +24,6 @@ const FieldLabel = ({ children, icon: Icon }) => (
         {Icon && <Icon className="h-3 w-3" />}
         {children}
     </label>
-);
-
-const InputBox = ({ children }) => (
-    <div className="relative bg-[#0d0d0d] border border-[#333333] focus-within:border-yellow-500 transition-colors duration-150">
-        {children}
-    </div>
 );
 
 const TravelButton = ({ option, active, onClick }) => (
@@ -54,16 +49,132 @@ const TravelButton = ({ option, active, onClick }) => (
     </button>
 );
 
+const ItemRow = ({ item, index, total, onChange, onRemove }) => {
+    const update = (key) => (e) => onChange(index, { ...item, [key]: e.target.value });
+    return (
+        <div
+            data-testid={`quick-item-${index}`}
+            className="border border-[#262626] bg-[#0a0a0a] p-3 space-y-3 relative"
+        >
+            <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] tracking-[0.25em] uppercase font-mono text-yellow-500">
+                    Article #{index + 1}
+                </span>
+                {total > 1 && (
+                    <button
+                        type="button"
+                        data-testid={`quick-item-remove-${index}`}
+                        onClick={() => onRemove(index)}
+                        className="text-gray-500 hover:text-red-500 transition-colors"
+                        aria-label="Supprimer cet article"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
+
+            {/* Nom + plateforme */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                    data-testid={`quick-item-name-${index}`}
+                    type="text"
+                    value={item.itemName}
+                    onChange={update("itemName")}
+                    placeholder="Nom de l'article"
+                    className="h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                />
+                <Select
+                    value={item.platform}
+                    onValueChange={(v) => onChange(index, { ...item, platform: v })}
+                >
+                    <SelectTrigger
+                        data-testid={`quick-item-platform-${index}`}
+                        className="h-10 bg-[#0d0d0d] border border-[#333333] rounded-none focus:border-yellow-500 focus:ring-0 text-white text-sm px-3"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0d0d0d] border border-[#333333] rounded-none text-white">
+                        {PLATFORMS.map((p) => (
+                            <SelectItem
+                                key={p.value}
+                                value={p.value}
+                                className="text-sm focus:bg-yellow-500 focus:text-black rounded-none cursor-pointer"
+                            >
+                                {p.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Achat + vente */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="relative">
+                    <input
+                        data-testid={`quick-item-purchase-${index}`}
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={item.purchasePrice}
+                        onChange={update("purchasePrice")}
+                        placeholder="Prix achat"
+                        className="w-full h-11 px-3 pr-10 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-300 text-base font-mono font-semibold focus:outline-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm">€</span>
+                </div>
+                <div className="relative">
+                    <input
+                        data-testid={`quick-item-sale-${index}`}
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={item.salePrice}
+                        onChange={update("salePrice")}
+                        placeholder="Prix vente"
+                        className="w-full h-11 px-3 pr-10 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-green-400 text-base font-mono font-semibold focus:outline-none"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm">€</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function CalcForm({ values, setValues, travelOptions = [] }) {
-    const update = (key) => (e) =>
-        setValues((v) => ({ ...v, [key]: e.target.value }));
+    const blankItem = () => ({
+        id: Math.random().toString(36).slice(2, 10),
+        itemName: "",
+        platform: "leboncoin",
+        purchasePrice: "",
+        salePrice: "",
+    });
+
+    const updateItem = (index, newItem) => {
+        setValues((v) => {
+            const items = [...(v.items || [])];
+            items[index] = newItem;
+            return { ...v, items };
+        });
+    };
+
+    const addItem = () => {
+        setValues((v) => ({ ...v, items: [...(v.items || []), blankItem()] }));
+    };
+
+    const removeItem = (index) => {
+        setValues((v) => {
+            const items = (v.items || []).filter((_, i) => i !== index);
+            return { ...v, items: items.length ? items : [blankItem()] };
+        });
+    };
 
     return (
         <section
             data-testid="calc-form"
             className="bg-[#111111] border border-[#262626] p-6 md:p-10 relative"
         >
-            {/* corner accents */}
             <div className="absolute top-0 left-0 w-3 h-3 border-l border-t border-yellow-500" />
             <div className="absolute top-0 right-0 w-3 h-3 border-r border-t border-yellow-500" />
             <div className="absolute bottom-0 left-0 w-3 h-3 border-l border-b border-yellow-500" />
@@ -79,120 +190,65 @@ export default function CalcForm({ values, setValues, travelOptions = [] }) {
                     </h2>
                 </div>
                 <span className="font-mono text-[11px] text-gray-500">
-                    [01/06]
+                    {(values.items || []).length} article{(values.items || []).length > 1 ? "s" : ""}
                 </span>
             </div>
 
             <div className="space-y-6">
-                {/* Row 1: Item name + Date */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <FieldLabel icon={Box}>Nom de l'article</FieldLabel>
-                        <InputBox>
-                            <input
-                                data-testid="input-item-name"
-                                type="text"
-                                value={values.itemName}
-                                onChange={update("itemName")}
-                                placeholder="RTX 3070, i7-12700K..."
-                                className="w-full h-12 px-4 bg-transparent text-white text-sm focus:outline-none placeholder:text-gray-600"
-                            />
-                        </InputBox>
-                    </div>
-
-                    <div className="space-y-2">
-                        <FieldLabel icon={CalendarIcon}>Date</FieldLabel>
-                        <InputBox>
-                            <input
-                                data-testid="input-date"
-                                type="date"
-                                value={values.date}
-                                onChange={update("date")}
-                                className="w-full h-12 px-4 bg-transparent text-white text-sm font-mono focus:outline-none [color-scheme:dark]"
-                            />
-                        </InputBox>
-                    </div>
-                </div>
-
-                {/* Row 2: Platform */}
+                {/* Date */}
                 <div className="space-y-2">
-                    <FieldLabel icon={Tag}>Plateforme de revente</FieldLabel>
-                    <Select
-                        value={values.platform}
-                        onValueChange={(v) => setValues((s) => ({ ...s, platform: v }))}
-                    >
-                        <SelectTrigger
-                            data-testid="select-platform"
-                            className="h-12 bg-[#0d0d0d] border border-[#333333] rounded-none focus:border-yellow-500 focus:ring-0 text-white text-sm px-4"
-                        >
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent
-                            className="bg-[#0d0d0d] border border-[#333333] rounded-none text-white"
-                        >
-                            {PLATFORMS.map((p) => (
-                                <SelectItem
-                                    key={p.value}
-                                    value={p.value}
-                                    data-testid={`platform-${p.value}`}
-                                    className="text-sm focus:bg-yellow-500 focus:text-black rounded-none cursor-pointer"
-                                >
-                                    {p.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <FieldLabel icon={CalendarIcon}>Date</FieldLabel>
+                    <input
+                        data-testid="input-date"
+                        type="date"
+                        value={values.date}
+                        onChange={(e) => setValues((v) => ({ ...v, date: e.target.value }))}
+                        className="w-full sm:w-1/2 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm font-mono focus:outline-none [color-scheme:dark]"
+                    />
                 </div>
 
                 {/* divider */}
                 <div className="flex items-center gap-3 py-2">
                     <div className="h-px flex-1 bg-[#262626]" />
                     <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-gray-600">
-                        Montants €
+                        Articles
                     </span>
                     <div className="h-px flex-1 bg-[#262626]" />
                 </div>
 
-                {/* Row 3: Purchase price + Sale price */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <FieldLabel icon={ArrowDownToLine}>Prix d'achat</FieldLabel>
-                        <InputBox>
-                            <input
-                                data-testid="input-purchase-price"
-                                type="number"
-                                inputMode="decimal"
-                                step="0.01"
-                                min="0"
-                                value={values.purchasePrice}
-                                onChange={update("purchasePrice")}
-                                placeholder="0.00"
-                                className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
-                        </InputBox>
-                    </div>
-
-                    <div className="space-y-2">
-                        <FieldLabel icon={ArrowUpFromLine}>Prix de vente</FieldLabel>
-                        <InputBox>
-                            <input
-                                data-testid="input-sale-price"
-                                type="number"
-                                inputMode="decimal"
-                                step="0.01"
-                                min="0"
-                                value={values.salePrice}
-                                onChange={update("salePrice")}
-                                placeholder="0.00"
-                                className="w-full h-14 px-4 pr-10 bg-transparent text-white text-2xl font-mono font-semibold focus:outline-none placeholder:text-gray-700"
-                            />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-base">€</span>
-                        </InputBox>
-                    </div>
+                {/* Items list */}
+                <div className="space-y-3">
+                    {(values.items || []).map((item, idx) => (
+                        <ItemRow
+                            key={item.id}
+                            item={item}
+                            index={idx}
+                            total={(values.items || []).length}
+                            onChange={updateItem}
+                            onRemove={removeItem}
+                        />
+                    ))}
+                    <button
+                        type="button"
+                        data-testid="quick-add-item"
+                        onClick={addItem}
+                        className="w-full h-10 border border-dashed border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 text-[11px] tracking-[0.2em] uppercase font-mono font-semibold flex items-center justify-center gap-2 transition-colors"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Ajouter un article
+                    </button>
                 </div>
 
-                {/* Row 4: Delivery — boutons cliquables (mêmes options qu'assemblage) */}
+                {/* divider */}
+                <div className="flex items-center gap-3 py-2">
+                    <div className="h-px flex-1 bg-[#262626]" />
+                    <span className="font-mono text-[10px] tracking-[0.25em] uppercase text-gray-600">
+                        Livraison
+                    </span>
+                    <div className="h-px flex-1 bg-[#262626]" />
+                </div>
+
+                {/* Delivery zones */}
                 <div className="space-y-2">
                     <FieldLabel icon={MapPin}>Livraison / Déplacement</FieldLabel>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -201,27 +257,22 @@ export default function CalcForm({ values, setValues, travelOptions = [] }) {
                                 key={t.key}
                                 option={t}
                                 active={values.deliveryZone === t.key}
-                                onClick={() =>
-                                    setValues((s) => ({ ...s, deliveryZone: t.key }))
-                                }
+                                onClick={() => setValues((s) => ({ ...s, deliveryZone: t.key }))}
                             />
                         ))}
                     </div>
                     <p className="text-[11px] text-gray-500 font-mono">
-                        Choisis le mode de livraison ou la zone de déplacement.
+                        Choisis le mode de livraison ou la zone de déplacement (compté une fois pour toute la commande).
                     </p>
                 </div>
 
-                {/* Reset button */}
+                {/* Reset */}
                 <button
                     data-testid="btn-reset"
                     onClick={() =>
                         setValues({
-                            itemName: "",
                             date: new Date().toISOString().slice(0, 10),
-                            platform: "leboncoin",
-                            purchasePrice: "",
-                            salePrice: "",
+                            items: [blankItem()],
                             deliveryZone: "vauvert",
                         })
                     }
