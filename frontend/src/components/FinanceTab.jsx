@@ -439,34 +439,58 @@ export default function FinanceTab() {
     }, [urssafPrompt.show, urssafPrompt.suggestedAmount, urssafPromptAmount]);
 
     // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-2
-    // Prochaine URSSAF = 4 du mois courant si pas encore prélevée, sinon 4 de M+1
-    const nextUrssaf = useMemo(() => {
+    // Retourne la liste des prélèvements à venir dans la fenêtre PREV_HORIZON jours (max 3)
+    const upcomingUrssaf = useMemo(() => {
         const today = new Date();
-        const curCycle = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-        const handledCurrent = (balance.urssaf_handled_cycles || []).find((h) => h.cycle === curCycle);
-        const past4th = today.getDate() >= 4;
-
-        // Si on n'est pas encore après le 4 OU si le cycle de ce mois n'a pas été traité :
-        // la prochaine URSSAF = 4 de CE mois, basée sur CA de M-2 (prev_prev)
-        // Sinon : la prochaine = 4 de M+1, basée sur CA de M-1 (previous)
-        const useCurrentMonthPayment = !past4th || !handledCurrent;
-
-        const cycle = useCurrentMonthPayment
-            ? curCycle
-            : (() => {
-                const n = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-                return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
-            })();
-        const sourceMonth = useCurrentMonthPayment
-            ? (summary?.prev_prev_month || "")
-            : (summary?.previous_month || "");
-        const autoAmount = useCurrentMonthPayment
-            ? (summary?.prev_prev?.total_taxes || 0)
-            : (summary?.previous?.total_taxes || 0);
+        const handled = balance.urssaf_handled_cycles || [];
         const overrideVal = parseFloat(urssafNextOverride) || 0;
-        const amount = overrideVal > 0 ? overrideVal : autoAmount;
-        return { cycle, sourceMonth, amount, useCurrentMonthPayment };
-    }, [balance.urssaf_handled_cycles, summary, urssafNextOverride]);
+        const items = [];
+
+        // Tester jusqu'à 3 cycles : ce mois, M+1, M+2
+        for (let offset = 0; offset <= 2; offset++) {
+            const payDate = new Date(today.getFullYear(), today.getMonth() + offset, 4);
+            const diff = Math.floor((payDate - today) / (1000 * 60 * 60 * 24));
+            if (diff < 0 || diff > PREV_HORIZON) continue;
+
+            const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
+            if (handled.find((h) => h.cycle === cycle)) continue;
+
+            // Source = M-2 relative to the payment month
+            const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 2, 1);
+            const sourceMonth = `${srcDate.getFullYear()}-${String(srcDate.getMonth() + 1).padStart(2, "0")}`;
+
+            // Map source month to the right summary bucket
+            let autoAmount = 0;
+            if (sourceMonth === summary?.prev_prev_month) autoAmount = summary?.prev_prev?.total_taxes || 0;
+            else if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
+            else if (sourceMonth === summary?.month) autoAmount = summary?.current?.total_taxes || 0;
+
+            // Override s'applique uniquement au premier cycle non traité (le plus imminent)
+            const isFirstShown = items.length === 0;
+            const amount = isFirstShown && overrideVal > 0 ? overrideVal : autoAmount;
+
+            if (amount > 0) {
+                items.push({ cycle, sourceMonth, amount, payDate: payDate.toISOString().slice(0, 10) });
+            }
+        }
+        return items;
+    }, [balance.urssaf_handled_cycles, summary, urssafNextOverride, PREV_HORIZON]);
+
+    // Le "prochain" prélèvement = le premier de la liste (ou un fallback vide)
+    const nextUrssaf = useMemo(() => {
+        if (upcomingUrssaf.length > 0) {
+            return { ...upcomingUrssaf[0], useCurrentMonthPayment: upcomingUrssaf[0].cycle.endsWith(String(new Date().getMonth() + 1).padStart(2, "0")) };
+        }
+        // No payment in horizon — still compute the "would-be" next cycle for UI labels
+        const today = new Date();
+        const cycle = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+        return { cycle, sourceMonth: summary?.prev_prev_month || "", amount: 0, useCurrentMonthPayment: true };
+    }, [upcomingUrssaf, summary]);
+
+    const totalUpcomingUrssaf = useMemo(
+        () => upcomingUrssaf.reduce((s, u) => s + u.amount, 0),
+        [upcomingUrssaf]
+    );
 
     const projected = useMemo(() => {
         if (!cur) return 0;
@@ -476,12 +500,12 @@ export default function FinanceTab() {
             real
             + pending.total
             + revenuesUpcomingTotal
-            - nextUrssaf.amount
+            - totalUpcomingUrssaf
             - cb
             - lbcList.total
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, nextUrssaf.amount]);
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -1154,17 +1178,26 @@ export default function FinanceTab() {
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Achats en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">
-                                        − Prochaine URSSAF
-                                        {nextUrssaf.sourceMonth && (
-                                            <span className="text-gray-600 text-[10px] ml-1">
-                                                (CA {monthLabel(nextUrssaf.sourceMonth).split(" ")[0]})
+                                {upcomingUrssaf.length === 0 ? (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">− Prochaine URSSAF</span>
+                                        <span className="text-red-400">−0,00 €</span>
+                                    </div>
+                                ) : (
+                                    upcomingUrssaf.map((u, idx) => (
+                                        <div key={u.cycle} className="flex justify-between" data-testid={`urssaf-upcoming-${idx}`}>
+                                            <span className="text-gray-400">
+                                                − URSSAF 4 {monthLabel(u.cycle).split(" ")[0]}
+                                                {u.sourceMonth && (
+                                                    <span className="text-gray-600 text-[10px] ml-1">
+                                                        (CA {monthLabel(u.sourceMonth).split(" ")[0]})
+                                                    </span>
+                                                )}
                                             </span>
-                                        )}
-                                    </span>
-                                    <span className="text-red-400">−{fmt(nextUrssaf.amount)} €</span>
-                                </div>
+                                            <span className="text-red-400">−{fmt(u.amount)} €</span>
+                                        </div>
+                                    ))
+                                )}
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
                                     <span className={`text-lg font-bold ${projected >= 0 ? "text-green-500" : "text-red-500"}`}>
