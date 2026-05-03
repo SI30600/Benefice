@@ -1205,7 +1205,7 @@ export default function FinanceTab() {
                                     </div>
                                 ) : (
                                     upcomingUrssaf.map((u, idx) => (
-                                        <div key={u.cycle} className="flex justify-between" data-testid={`urssaf-upcoming-${idx}`}>
+                                        <div key={u.cycle} className="flex justify-between items-center" data-testid={`urssaf-upcoming-${idx}`}>
                                             <span className="text-gray-400">
                                                 − URSSAF 4 {monthLabel(u.cycle).split(" ")[0]}
                                                 {u.sourceMonth && (
@@ -1214,7 +1214,17 @@ export default function FinanceTab() {
                                                     </span>
                                                 )}
                                             </span>
-                                            <span className="text-red-400">−{fmt(u.amount)} €</span>
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="text-red-400">−{fmt(u.amount)} €</span>
+                                                <button
+                                                    data-testid={`urssaf-skip-${idx}`}
+                                                    onClick={() => handleUrssaf(u.cycle, u.amount, "skip", u.sourceMonth)}
+                                                    className="text-gray-600 hover:text-yellow-500 text-[11px] leading-none px-1 transition-colors"
+                                                    title="Déjà intégrée au solde réel — retirer de la prévision"
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
                                         </div>
                                     ))
                                 )}
