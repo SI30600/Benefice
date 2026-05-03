@@ -3,7 +3,7 @@ import axios from "axios";
 import {
     Wallet, Plus, Trash2, Calendar, ArrowDownToLine, ArrowUpFromLine,
     AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
-    FileCheck2, ExternalLink, TrendingUp,
+    FileCheck2, ExternalLink, TrendingUp, RotateCcw, Package,
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -226,6 +226,18 @@ export default function FinanceTab() {
     const deleteLbcPurchase = async (id) => {
         await axios.delete(`${API}/finance/lbc-purchases/${id}`);
         refresh();
+    };
+
+    const resetMonth = async (yyyymm) => {
+        if (!yyyymm) return;
+        const label = monthLabel(yyyymm);
+        const ok = window.confirm(
+            `⚠ Reset du mois ${label}\n\nCela supprime TOUTES les écritures finance (CA + achats) de ce mois.\nLes paiements en attente, achats LBC en attente et abonnements ne sont PAS touchés.\n\nContinuer ?`
+        );
+        if (!ok) return;
+        const res = await axios.delete(`${API}/finance/entries/month/${yyyymm}`);
+        refresh();
+        alert(`✓ ${res.data.deleted} écriture(s) supprimée(s) pour ${label}`);
     };
 
     const addCharge = async () => {
@@ -584,8 +596,20 @@ export default function FinanceTab() {
                         {/* Récapitulatif compact */}
                         <SectionCard className="lg:col-span-2">
                             <SectionTitle icon={Receipt}>Récapitulatif</SectionTitle>
-                            <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-yellow-500 mb-2">
-                                {monthLabel(month)} (en cours)
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-yellow-500">
+                                    {monthLabel(month)} (en cours)
+                                </div>
+                                <button
+                                    data-testid="reset-current-month"
+                                    type="button"
+                                    onClick={() => resetMonth(month)}
+                                    className="inline-flex items-center gap-1 px-2 h-6 border border-red-500/40 hover:bg-red-500/10 text-red-400 text-[9px] tracking-[0.15em] uppercase font-mono transition-colors"
+                                    title={`Réinitialiser ${monthLabel(month)}`}
+                                >
+                                    <RotateCcw className="h-3 w-3" />
+                                    Reset
+                                </button>
                             </div>
 
                             {/* Bénéfice net en poche — chiffre HERO du mois */}
@@ -689,8 +713,20 @@ export default function FinanceTab() {
 
                             {prev && (
                                 <div className="mt-4 pt-4 border-t border-[#333333]">
-                                    <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-400 mb-2">
-                                        {monthLabel(summary.previous_month)} (mois précédent)
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-400">
+                                            {monthLabel(summary.previous_month)} (mois précédent)
+                                        </div>
+                                        <button
+                                            data-testid="reset-previous-month"
+                                            type="button"
+                                            onClick={() => resetMonth(summary.previous_month)}
+                                            className="inline-flex items-center gap-1 px-2 h-6 border border-red-500/40 hover:bg-red-500/10 text-red-400 text-[9px] tracking-[0.15em] uppercase font-mono transition-colors"
+                                            title={`Réinitialiser ${monthLabel(summary.previous_month)}`}
+                                        >
+                                            <RotateCcw className="h-3 w-3" />
+                                            Reset
+                                        </button>
                                     </div>
 
                                     <div
@@ -1057,41 +1093,57 @@ export default function FinanceTab() {
                         </p>
                     ) : (
                         <div className="space-y-1 max-h-72 overflow-y-auto">
-                            {pending.items.map((p) => (
-                                <div
-                                    key={p.id}
-                                    data-testid={`pending-item-${p.id}`}
-                                    className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
-                                >
-                                    <div className="flex flex-col min-w-0 flex-1">
-                                        <span className="text-sm text-white truncate">{p.client_name}</span>
-                                        <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono">
-                                            {p.category || "prestation"}
+                            {pending.items.map((p) => {
+                                const linked = lbcList.items.filter(
+                                    (lp) => (lp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase() && (p.client_name || "").trim()
+                                );
+                                const linkedAmount = linked.reduce((s, lp) => s + (lp.amount || 0), 0);
+                                return (
+                                    <div
+                                        key={p.id}
+                                        data-testid={`pending-item-${p.id}`}
+                                        className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                    >
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="text-sm text-white truncate">{p.client_name}</span>
+                                            <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono">
+                                                {p.category || "prestation"}
+                                                {linkedAmount > 0 && (
+                                                    <span
+                                                        data-testid={`pending-linked-${p.id}`}
+                                                        className="ml-2 inline-flex items-center gap-1 text-yellow-400 normal-case tracking-normal"
+                                                        title={`${linked.length} achat(s) lié(s) — sera déduit à l'encaissement`}
+                                                    >
+                                                        <Package className="h-3 w-3" />
+                                                        −{fmt(linkedAmount)} € achat lié
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </div>
+                                        <span className="font-mono text-sm font-bold text-green-400 shrink-0">
+                                            {fmt(p.amount)} €
                                         </span>
+                                        <button
+                                            data-testid={`pending-confirm-${p.id}`}
+                                            onClick={() => confirmPending(p.id)}
+                                            className="flex items-center gap-1 px-2 h-7 bg-green-600 hover:bg-green-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
+                                            aria-label="Encaisser"
+                                            title="Virement reçu : convertir en CA"
+                                        >
+                                            <Check className="h-3 w-3" />
+                                            Encaisser
+                                        </button>
+                                        <button
+                                            data-testid={`pending-delete-${p.id}`}
+                                            onClick={() => deletePending(p.id)}
+                                            className="text-gray-500 hover:text-red-500 transition-colors"
+                                            aria-label="Supprimer"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     </div>
-                                    <span className="font-mono text-sm font-bold text-green-400 shrink-0">
-                                        {fmt(p.amount)} €
-                                    </span>
-                                    <button
-                                        data-testid={`pending-confirm-${p.id}`}
-                                        onClick={() => confirmPending(p.id)}
-                                        className="flex items-center gap-1 px-2 h-7 bg-green-600 hover:bg-green-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
-                                        aria-label="Encaisser"
-                                        title="Virement reçu : convertir en CA"
-                                    >
-                                        <Check className="h-3 w-3" />
-                                        Encaisser
-                                    </button>
-                                    <button
-                                        data-testid={`pending-delete-${p.id}`}
-                                        onClick={() => deletePending(p.id)}
-                                        className="text-gray-500 hover:text-red-500 transition-colors"
-                                        aria-label="Supprimer"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </SectionCard>

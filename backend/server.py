@@ -185,6 +185,15 @@ async def delete_finance_entry(entry_id: str, _=Depends(require_auth)):
     return {"deleted": True}
 
 
+@api_router.delete("/finance/entries/month/{month}")
+async def reset_finance_month(month: str, _=Depends(require_auth)):
+    """Supprime toutes les écritures finance d'un mois donné (YYYY-MM)."""
+    if len(month) != 7 or month[4] != "-":
+        raise HTTPException(status_code=400, detail="Format mois invalide (YYYY-MM)")
+    res = await db.finance_entries.delete_many({"date": {"$regex": f"^{month}-"}})
+    return {"deleted": res.deleted_count, "month": month}
+
+
 @api_router.get("/finance/summary")
 async def get_finance_summary(month: Optional[str] = None, _=Depends(require_auth)):
     """Summary of a month (default current). Returns current + previous month."""

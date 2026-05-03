@@ -83,6 +83,8 @@ Application de calcul de bénéfice net pour revente de pièces informatiques + 
 - **2026-04-30** : Suppression de la ligne "Bénéfice brut" (inutile en franchise TVA micro-BIC)
 - **2026-05-03** : Achats en attente — choix plateforme (LBC/Vinted/eBay/...) + nom client
 - **2026-05-03** : Auto-conversion achat→`finance_entries.category=achat` lors de l'encaissement d'un paiement avec client_name identique → "dans ta poche" reflète la vraie marge nette (testé : 690€ encaissé − 332.69€ achat = 264.16€ in pocket)
+- **2026-05-03** : Badge "📦 −X€ achat lié" sur les paiements en attente quand un achat matche le client_name (preview avant encaissement)
+- **2026-05-03** : Boutons Reset par mois (en cours + mois précédent) — endpoint `DELETE /api/finance/entries/month/{YYYY-MM}` avec confirmation UI
 
 ### 🚧 Configuration Azure requise
 - App registration en single-tenant
