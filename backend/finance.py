@@ -168,9 +168,12 @@ class WifePaymentCreate(BaseModel):
 
 
 class AccountBalance(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     balance: float = 0
     cb_deferred: float = 0
     lbc_pending: float = 0
+    urssaf_handled_cycles: list = Field(default_factory=list)
+    # each item: {cycle:"YYYY-MM", amount:float, action:"consume"|"skip", date:ISO, source_month:"YYYY-MM"}
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 

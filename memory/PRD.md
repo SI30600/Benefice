@@ -85,6 +85,7 @@ Application de calcul de bénéfice net pour revente de pièces informatiques + 
 - **2026-05-03** : Auto-conversion achat→`finance_entries.category=achat` lors de l'encaissement d'un paiement avec client_name identique → "dans ta poche" reflète la vraie marge nette (testé : 690€ encaissé − 332.69€ achat = 264.16€ in pocket)
 - **2026-05-03** : Badge "📦 −X€ achat lié" sur les paiements en attente quand un achat matche le client_name (preview avant encaissement)
 - **2026-05-03** : Boutons Reset par mois (en cours + mois précédent) — endpoint `DELETE /api/finance/entries/month/{YYYY-MM}` avec confirmation UI
+- **2026-05-03** : URSSAF auto-déduction du Solde réel — le 4 du mois M, bannière de confirmation calcule le prélèvement depuis CA de M-2 (2 mois de décalage), 3 actions : `Déduire du solde` / `Déjà fait` / `Pas encore`. Undo disponible. Backend : `urssaf_handled_cycles[]` + `POST /finance/balance/urssaf-handle` + `POST /finance/balance/urssaf-undo` + summary `prev_prev_month`
 
 ### 🚧 Configuration Azure requise
 - App registration en single-tenant

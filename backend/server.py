@@ -204,6 +204,8 @@ async def get_finance_summary(month: Optional[str] = None, _=Depends(require_aut
     y, m = map(int, month.split("-"))
     prev_y, prev_m = (y - 1, 12) if m == 1 else (y, m - 1)
     prev_month = f"{prev_y:04d}-{prev_m:02d}"
+    pp_y, pp_m = (prev_y - 1, 12) if prev_m == 1 else (prev_y, prev_m - 1)
+    prev_prev_month = f"{pp_y:04d}-{pp_m:02d}"
 
     cur_rows = await db.finance_entries.find(
         {"date": {"$regex": f"^{month}-"}}, {"_id": 0}
@@ -211,12 +213,17 @@ async def get_finance_summary(month: Optional[str] = None, _=Depends(require_aut
     prev_rows = await db.finance_entries.find(
         {"date": {"$regex": f"^{prev_month}-"}}, {"_id": 0}
     ).to_list(2000)
+    prev_prev_rows = await db.finance_entries.find(
+        {"date": {"$regex": f"^{prev_prev_month}-"}}, {"_id": 0}
+    ).to_list(2000)
 
     return {
         "month": month,
         "previous_month": prev_month,
+        "prev_prev_month": prev_prev_month,
         "current": compute_summary(cur_rows),
         "previous": compute_summary(prev_rows),
+        "prev_prev": compute_summary(prev_prev_rows),
     }
 
 
@@ -467,9 +474,10 @@ async def delete_wife_payment(payment_id: str, _=Depends(require_auth)):
 async def get_balance(_=Depends(require_auth)):
     doc = await db.account_balance.find_one({"_id": BALANCE_DOC_ID}, {"_id": 0})
     if not doc:
-        return {"balance": 0, "cb_deferred": 0, "lbc_pending": 0, "updated_at": ""}
+        return {"balance": 0, "cb_deferred": 0, "lbc_pending": 0, "urssaf_handled_cycles": [], "updated_at": ""}
     doc.setdefault("cb_deferred", 0)
     doc.setdefault("lbc_pending", 0)
+    doc.setdefault("urssaf_handled_cycles", [])
     return doc
 
 
@@ -481,6 +489,70 @@ async def set_balance(body: AccountBalance, _=Depends(require_auth)):
         {"_id": BALANCE_DOC_ID}, {"$set": update}, upsert=True
     )
     return update
+
+
+class UrssafHandleBody(BaseModel):
+    cycle: str  # "YYYY-MM" — the payment month (when the 4th-of-month withdrawal happens)
+    amount: float
+    action: str  # "consume" | "skip"
+    source_month: str = ""  # "YYYY-MM" — the CA source (cycle-2)
+
+
+@api_router.post("/finance/balance/urssaf-handle")
+async def urssaf_handle(body: UrssafHandleBody, _=Depends(require_auth)):
+    if body.action not in ("consume", "skip"):
+        raise HTTPException(status_code=400, detail="Action invalide")
+    doc = await db.account_balance.find_one({"_id": BALANCE_DOC_ID}, {"_id": 0}) or {}
+    handled = doc.get("urssaf_handled_cycles", [])
+    # If cycle already handled, reject (must undo first)
+    if any(h.get("cycle") == body.cycle for h in handled):
+        raise HTTPException(status_code=409, detail="Cycle déjà traité — annule avant de refaire")
+    new_balance = float(doc.get("balance", 0))
+    if body.action == "consume":
+        new_balance = round(new_balance - body.amount, 2)
+    handled.append({
+        "cycle": body.cycle,
+        "amount": body.amount,
+        "action": body.action,
+        "source_month": body.source_month,
+        "date": now_iso(),
+    })
+    await db.account_balance.update_one(
+        {"_id": BALANCE_DOC_ID},
+        {"$set": {
+            "balance": new_balance,
+            "urssaf_handled_cycles": handled,
+            "updated_at": now_iso(),
+        }},
+        upsert=True,
+    )
+    return {"balance": new_balance, "handled": handled[-1]}
+
+
+class UrssafUndoBody(BaseModel):
+    cycle: str
+
+
+@api_router.post("/finance/balance/urssaf-undo")
+async def urssaf_undo(body: UrssafUndoBody, _=Depends(require_auth)):
+    doc = await db.account_balance.find_one({"_id": BALANCE_DOC_ID}, {"_id": 0}) or {}
+    handled = doc.get("urssaf_handled_cycles", [])
+    target = next((h for h in handled if h.get("cycle") == body.cycle), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Aucune déduction trouvée pour ce cycle")
+    new_balance = float(doc.get("balance", 0))
+    if target.get("action") == "consume":
+        new_balance = round(new_balance + float(target.get("amount", 0)), 2)
+    handled = [h for h in handled if h.get("cycle") != body.cycle]
+    await db.account_balance.update_one(
+        {"_id": BALANCE_DOC_ID},
+        {"$set": {
+            "balance": new_balance,
+            "urssaf_handled_cycles": handled,
+            "updated_at": now_iso(),
+        }},
+    )
+    return {"balance": new_balance, "restored": target}
 
 
 # ---- App wiring -------------------------------------------------------------

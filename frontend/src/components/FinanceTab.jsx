@@ -240,6 +240,22 @@ export default function FinanceTab() {
         alert(`✓ ${res.data.deleted} écriture(s) supprimée(s) pour ${label}`);
     };
 
+    // URSSAF auto-deduction: on/after the 4th of month M, withdraw URSSAF computed on M-2 CA
+    const handleUrssaf = async (cycle, amount, action, sourceMonth) => {
+        await axios.post(`${API}/finance/balance/urssaf-handle`, {
+            cycle, amount: parseFloat(amount) || 0, action, source_month: sourceMonth || "",
+        });
+        // Clear any localStorage override so it doesn't re-apply next month
+        try { localStorage.removeItem("urssaf_next_override"); } catch { /* noop */ }
+        setUrssafNextOverride("");
+        refresh();
+    };
+
+    const undoUrssaf = async (cycle) => {
+        await axios.post(`${API}/finance/balance/urssaf-undo`, { cycle });
+        refresh();
+    };
+
     const addCharge = async () => {
         const amt = parseFloat(chargeForm.amount);
         const day = parseInt(chargeForm.day_of_month, 10);
@@ -385,6 +401,42 @@ export default function FinanceTab() {
         () => (revenues.items || []).filter((r) => !r.prepaid && (r.day_of_month || 0) >= todayDay),
         [revenues.items, todayDay]
     );
+
+    // URSSAF auto-deduction prompt: on/after the 4th of month M, withdraw URSSAF of CA from M-2
+    const urssafPrompt = useMemo(() => {
+        const today = new Date();
+        const cycle = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+        const handled = (balance.urssaf_handled_cycles || []).find((h) => h.cycle === cycle);
+        const past4th = today.getDate() >= 4;
+        // Amount from M-2 summary (only available when viewing current month's summary)
+        const viewingCurrent = month === cycle;
+        const autoAmount = viewingCurrent
+            ? (summary?.prev_prev?.total_taxes || 0)
+            : 0;
+        // Try to recover a raw override value set last month (bypass expiry check)
+        let rawOverride = 0;
+        try {
+            const raw = localStorage.getItem("urssaf_next_override") || "";
+            if (raw.includes("|")) {
+                const [, v] = raw.split("|");
+                rawOverride = parseFloat(v) || 0;
+            }
+        } catch { /* noop */ }
+        const suggestedAmount = rawOverride > 0 ? rawOverride : autoAmount;
+        const sourceMonth = summary?.prev_prev_month || "";
+        return {
+            cycle, past4th, handled, suggestedAmount, sourceMonth,
+            show: past4th && !handled && viewingCurrent && suggestedAmount > 0,
+            showUndo: !!handled,
+        };
+    }, [balance.urssaf_handled_cycles, summary, month]);
+
+    const [urssafPromptAmount, setUrssafPromptAmount] = useState("");
+    useEffect(() => {
+        if (urssafPrompt.show && !urssafPromptAmount) {
+            setUrssafPromptAmount(String(urssafPrompt.suggestedAmount));
+        }
+    }, [urssafPrompt.show, urssafPrompt.suggestedAmount, urssafPromptAmount]);
 
     const projected = useMemo(() => {
         if (!cur) return 0;
@@ -768,6 +820,102 @@ export default function FinanceTab() {
                         {/* Account state */}
                         <SectionCard>
                             <SectionTitle icon={Wallet}>État du compte</SectionTitle>
+
+                            {/* URSSAF auto-deduction prompt */}
+                            {urssafPrompt.show && (
+                                <div
+                                    data-testid="urssaf-prompt-banner"
+                                    className="mb-4 border border-yellow-500/50 bg-yellow-500/5 p-3"
+                                >
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-[10px] tracking-[0.2em] uppercase font-mono text-yellow-500 font-bold">
+                                            ⚠ URSSAF prélevée le 4 {monthLabel(urssafPrompt.cycle).split(" ")[0]}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-gray-300 font-mono mb-2 leading-relaxed">
+                                        Montant prélevé sur le compte (basé sur CA de{" "}
+                                        <span className="text-yellow-400">
+                                            {monthLabel(urssafPrompt.sourceMonth)}
+                                        </span>
+                                        ) :
+                                    </p>
+                                    <div className="flex gap-2 mb-2">
+                                        <input
+                                            data-testid="urssaf-prompt-amount"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={urssafPromptAmount}
+                                            onChange={(e) => setUrssafPromptAmount(e.target.value)}
+                                            className="flex-1 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-base font-mono font-bold focus:outline-none"
+                                        />
+                                        <span className="self-center font-mono text-yellow-500 text-lg font-bold">€</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            data-testid="urssaf-prompt-consume"
+                                            onClick={() => handleUrssaf(urssafPrompt.cycle, urssafPromptAmount, "consume", urssafPrompt.sourceMonth)}
+                                            className="h-9 bg-red-600 hover:bg-red-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
+                                            title="Déduire ce montant du Solde réel"
+                                        >
+                                            Déduire du solde
+                                        </button>
+                                        <button
+                                            data-testid="urssaf-prompt-skip"
+                                            onClick={() => handleUrssaf(urssafPrompt.cycle, urssafPromptAmount, "skip", urssafPrompt.sourceMonth)}
+                                            className="h-9 bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#333333] text-gray-300 text-[9px] tracking-[0.12em] uppercase font-mono"
+                                            title="Déjà déduit manuellement — marquer le cycle comme traité"
+                                        >
+                                            Déjà fait
+                                        </button>
+                                        <button
+                                            data-testid="urssaf-prompt-not-yet"
+                                            onClick={() => { setUrssafPromptAmount(""); }}
+                                            className="h-9 bg-transparent border border-[#333333] hover:border-yellow-500 text-gray-400 hover:text-yellow-500 text-[9px] tracking-[0.12em] uppercase font-mono"
+                                            title="Je vérifierai plus tard"
+                                        >
+                                            Pas encore
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Undo banner — show if URSSAF was recently auto-deducted */}
+                            {urssafPrompt.showUndo && urssafPrompt.handled?.action === "consume" && (
+                                <div
+                                    data-testid="urssaf-undo-banner"
+                                    className="mb-4 border border-green-500/40 bg-green-500/5 px-3 py-2 flex items-center justify-between"
+                                >
+                                    <span className="text-[11px] font-mono text-green-400">
+                                        ✓ URSSAF −{fmt(urssafPrompt.handled.amount)} € déduite ({monthLabel(urssafPrompt.cycle).split(" ")[0]})
+                                    </span>
+                                    <button
+                                        data-testid="urssaf-undo-btn"
+                                        onClick={() => undoUrssaf(urssafPrompt.cycle)}
+                                        className="text-[9px] tracking-[0.15em] uppercase font-mono text-gray-400 hover:text-yellow-500 transition-colors"
+                                        title="Restaurer le montant au solde"
+                                    >
+                                        ↶ Annuler
+                                    </button>
+                                </div>
+                            )}
+                            {urssafPrompt.showUndo && urssafPrompt.handled?.action === "skip" && (
+                                <div
+                                    data-testid="urssaf-skip-banner"
+                                    className="mb-4 border border-gray-500/40 bg-[#0a0a0a] px-3 py-2 flex items-center justify-between"
+                                >
+                                    <span className="text-[11px] font-mono text-gray-400">
+                                        ✓ URSSAF {monthLabel(urssafPrompt.cycle).split(" ")[0]} marquée comme déjà traitée
+                                    </span>
+                                    <button
+                                        data-testid="urssaf-undo-btn"
+                                        onClick={() => undoUrssaf(urssafPrompt.cycle)}
+                                        className="text-[9px] tracking-[0.15em] uppercase font-mono text-gray-400 hover:text-yellow-500 transition-colors"
+                                    >
+                                        ↶ Annuler
+                                    </button>
+                                </div>
+                            )}
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
                                 Solde réel sur le compte
