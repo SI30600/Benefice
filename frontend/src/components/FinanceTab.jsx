@@ -1336,12 +1336,15 @@ export default function FinanceTab() {
                     ) : (
                         <div className="space-y-1 max-h-72 overflow-y-auto">
                             {pending.items.map((p) => {
-                                const linked = lbcList.items.filter(
-                                    (lp) => (lp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase() && (p.client_name || "").trim()
-                                );
+                                const cat = p.category || "materiel";
+                                // Un achat lié ne s'applique qu'aux pendings "matériel" (pas aux prestations)
+                                const linked = cat === "materiel"
+                                    ? lbcList.items.filter(
+                                        (lp) => (lp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase() && (p.client_name || "").trim()
+                                    )
+                                    : [];
                                 const linkedAmount = linked.reduce((s, lp) => s + (lp.amount || 0), 0);
                                 // Aperçu marge nette avant encaissement
-                                const cat = p.category || "prestation";
                                 // Taux total = URSSAF + impôt + CFP (13,5% matériel, 23,1% presta/formation)
                                 const rate = cat === "materiel" ? 0.135 : 0.231;
                                 const taxes = +((p.amount || 0) * rate).toFixed(2);

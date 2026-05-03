@@ -288,9 +288,10 @@ async def confirm_pending_payment(payment_id: str, _=Depends(require_auth)):
     await db.pending_payments.delete_one({"id": payment_id})
 
     # Auto-convert LBC purchases matching same client_name into "achat" entries
+    # Mais SEULEMENT si le pending encaissé est "materiel" (les prestations n'ont pas d'achat associé)
     linked_purchases = []
     client_key = (doc.get("client_name") or "").strip().lower()
-    if client_key:
+    if client_key and category == "materiel":
         matching = await db.lbc_purchases.find(
             {}, {"_id": 0}
         ).to_list(500)
