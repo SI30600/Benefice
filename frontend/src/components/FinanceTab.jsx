@@ -492,10 +492,24 @@ export default function FinanceTab() {
         return { cycle, sourceMonth: summary?.prev_prev_month || "", amount: 0, useCurrentMonthPayment: true };
     }, [upcomingUrssaf, summary]);
 
+    // URSSAF en cours du mois courant (non encore prélevée — sera prélevée le 4 de M+2)
+    // Se déduit aussi du "Disponible prév." pour ne pas se tromper sur l'argent réellement disponible
+    const currentMonthUrssaf = useMemo(() => {
+        return +(cur?.total_taxes || 0).toFixed(2);
+    }, [cur]);
+
     const totalUpcomingUrssaf = useMemo(
         () => upcomingUrssaf.reduce((s, u) => s + u.amount, 0),
         [upcomingUrssaf]
     );
+
+    // Ne compte pas 2 fois si l'URSSAF de M (cur) est déjà dans la liste upcomingUrssaf (fenêtre 35j)
+    const currentMonthUrssafInWindow = useMemo(() => {
+        if (!summary?.month) return false;
+        return upcomingUrssaf.some((u) => u.sourceMonth === summary.month);
+    }, [upcomingUrssaf, summary]);
+
+    const extraCurrentMonthUrssaf = currentMonthUrssafInWindow ? 0 : currentMonthUrssaf;
 
     const projected = useMemo(() => {
         if (!cur) return 0;
@@ -506,11 +520,12 @@ export default function FinanceTab() {
             + pending.total
             + revenuesUpcomingTotal
             - totalUpcomingUrssaf
+            - extraCurrentMonthUrssaf
             - cb
             - lbcList.total
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf]);
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -1202,6 +1217,17 @@ export default function FinanceTab() {
                                             <span className="text-red-400">−{fmt(u.amount)} €</span>
                                         </div>
                                     ))
+                                )}
+                                {extraCurrentMonthUrssaf > 0 && (
+                                    <div className="flex justify-between" data-testid="urssaf-current-accruing">
+                                        <span className="text-gray-400">
+                                            − URSSAF en cours
+                                            <span className="text-gray-600 text-[10px] ml-1">
+                                                (CA {monthLabel(summary?.month || "").split(" ")[0]})
+                                            </span>
+                                        </span>
+                                        <span className="text-red-400">−{fmt(extraCurrentMonthUrssaf)} €</span>
+                                    </div>
                                 )}
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
