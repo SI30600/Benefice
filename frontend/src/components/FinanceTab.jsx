@@ -1335,49 +1335,82 @@ export default function FinanceTab() {
                                     (lp) => (lp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase() && (p.client_name || "").trim()
                                 );
                                 const linkedAmount = linked.reduce((s, lp) => s + (lp.amount || 0), 0);
+                                // Aperçu marge nette avant encaissement
+                                const cat = p.category || "prestation";
+                                // Taux total = URSSAF + impôt + CFP (13,5% matériel, 23,1% presta/formation)
+                                const rate = cat === "materiel" ? 0.135 : 0.231;
+                                const taxes = +((p.amount || 0) * rate).toFixed(2);
+                                const netMargin = +((p.amount || 0) - taxes - linkedAmount).toFixed(2);
+                                const marginPct = (p.amount || 0) > 0 ? +((netMargin / p.amount) * 100).toFixed(1) : 0;
+                                const showMargin = linkedAmount > 0 && (p.amount || 0) > 0;
+                                const goodMargin = netMargin > 0 && marginPct >= 20;
+                                const okMargin = netMargin > 0 && marginPct < 20;
                                 return (
                                     <div
                                         key={p.id}
                                         data-testid={`pending-item-${p.id}`}
-                                        className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
+                                        className="flex flex-col gap-1 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
                                     >
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                            <span className="text-sm text-white truncate">{p.client_name}</span>
-                                            <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono">
-                                                {p.category || "prestation"}
-                                                {linkedAmount > 0 && (
-                                                    <span
-                                                        data-testid={`pending-linked-${p.id}`}
-                                                        className="ml-2 inline-flex items-center gap-1 text-yellow-400 normal-case tracking-normal"
-                                                        title={`${linked.length} achat(s) lié(s) — sera déduit à l'encaissement`}
-                                                    >
-                                                        <Package className="h-3 w-3" />
-                                                        −{fmt(linkedAmount)} € achat lié
-                                                    </span>
-                                                )}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <span className="text-sm text-white truncate">{p.client_name}</span>
+                                                <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono">
+                                                    {cat}
+                                                    {linkedAmount > 0 && (
+                                                        <span
+                                                            data-testid={`pending-linked-${p.id}`}
+                                                            className="ml-2 inline-flex items-center gap-1 text-yellow-400 normal-case tracking-normal"
+                                                            title={`${linked.length} achat(s) lié(s) — sera déduit à l'encaissement`}
+                                                        >
+                                                            <Package className="h-3 w-3" />
+                                                            −{fmt(linkedAmount)} € achat lié
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <span className="font-mono text-sm font-bold text-green-400 shrink-0">
+                                                {fmt(p.amount)} €
                                             </span>
+                                            <button
+                                                data-testid={`pending-confirm-${p.id}`}
+                                                onClick={() => confirmPending(p.id)}
+                                                className="flex items-center gap-1 px-2 h-7 bg-green-600 hover:bg-green-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
+                                                aria-label="Encaisser"
+                                                title="Virement reçu : convertir en CA"
+                                            >
+                                                <Check className="h-3 w-3" />
+                                                Encaisser
+                                            </button>
+                                            <button
+                                                data-testid={`pending-delete-${p.id}`}
+                                                onClick={() => deletePending(p.id)}
+                                                className="text-gray-500 hover:text-red-500 transition-colors"
+                                                aria-label="Supprimer"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
                                         </div>
-                                        <span className="font-mono text-sm font-bold text-green-400 shrink-0">
-                                            {fmt(p.amount)} €
-                                        </span>
-                                        <button
-                                            data-testid={`pending-confirm-${p.id}`}
-                                            onClick={() => confirmPending(p.id)}
-                                            className="flex items-center gap-1 px-2 h-7 bg-green-600 hover:bg-green-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
-                                            aria-label="Encaisser"
-                                            title="Virement reçu : convertir en CA"
-                                        >
-                                            <Check className="h-3 w-3" />
-                                            Encaisser
-                                        </button>
-                                        <button
-                                            data-testid={`pending-delete-${p.id}`}
-                                            onClick={() => deletePending(p.id)}
-                                            className="text-gray-500 hover:text-red-500 transition-colors"
-                                            aria-label="Supprimer"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        {showMargin && (
+                                            <div
+                                                data-testid={`pending-margin-${p.id}`}
+                                                className={`flex items-center justify-between gap-2 mt-1 px-2 py-1 border text-[10px] font-mono ${
+                                                    goodMargin
+                                                        ? "border-green-500/40 bg-green-500/5 text-green-400"
+                                                        : okMargin
+                                                            ? "border-yellow-500/40 bg-yellow-500/5 text-yellow-400"
+                                                            : "border-red-500/40 bg-red-500/5 text-red-400"
+                                                }`}
+                                            >
+                                                <span className="tracking-wider">
+                                                    {goodMargin ? "✓" : okMargin ? "⚠" : "✗"}{" "}
+                                                    {netMargin > 0 ? "marge nette" : "perte"} : {netMargin > 0 ? "+" : ""}{fmt(netMargin)} €
+                                                    {" "}<span className="text-gray-500">({marginPct.toFixed(0)}%)</span>
+                                                </span>
+                                                <span className="text-gray-500 text-[9px]">
+                                                    {fmt(p.amount)} − {fmt(taxes)} urssaf − {fmt(linkedAmount)} achat
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
