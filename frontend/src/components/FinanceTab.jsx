@@ -357,8 +357,8 @@ export default function FinanceTab() {
     const cur = summary?.current;
     const prev = summary?.previous;
 
-    // Charges/revenus récurrents dans les 30 prochains jours (horizon "disponible prév.")
-    const PREV_HORIZON = 30;
+    // Charges/revenus récurrents dans les 35 prochains jours (horizon "disponible prév.")
+    const PREV_HORIZON = 35;
     const todayDay = new Date().getDate();
 
     // Helpers : nombre d'occurrences d'un day_of_month dans les N prochains jours
@@ -1149,7 +1149,7 @@ export default function FinanceTab() {
                                         {fmt((parseFloat(balanceInput) || 0) - (parseFloat(cbDeferredInput) || 0))} €
                                     </span>
                                 </div>
-                                <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 30 prochains jours</div>
+                                <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 35 prochains jours</div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Achats en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
