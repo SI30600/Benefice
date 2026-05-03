@@ -535,13 +535,16 @@ export default function FinanceTab() {
             }
         });
 
-        // URSSAF : déclaration mensuelle, prélèvement le 4 avec décalage de 2 mois (CA M → paiement 4 de M+2)
+        // URSSAF : prélèvement le 4 de chaque mois avec décalage de 2 mois (CA M → paiement 4 de M+2)
+        // Pas d'estimatif : seuls les vrais CA saisis sont utilisés. L'override s'applique UNIQUEMENT
+        // au prochain prélèvement immédiat (quand le CA source n'est pas encore déclaré).
         const handled = balance.urssaf_handled_cycles || [];
-        const overrideVal = parseFloat(urssafNextOverride);
+        const overrideVal = parseFloat(urssafNextOverride) || 0;
 
-        // 4 du mois courant = URSSAF de M-2 (prev_prev) — si pas encore traitée
-        if (!handled.find((h) => h.cycle === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)) {
-            const amt = (overrideVal > 0 ? overrideVal : (summary?.prev_prev?.total_taxes || 0));
+        // 4 du mois courant = URSSAF de M-2 (prev_prev) — si pas encore traitée, peut utiliser l'override
+        const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        if (!handled.find((h) => h.cycle === curCycle)) {
+            const amt = overrideVal > 0 ? overrideVal : (summary?.prev_prev?.total_taxes || 0);
             if (amt > 0) {
                 const m0 = new Date(now.getFullYear(), now.getMonth(), 4);
                 const diff0 = Math.floor((m0 - now) / (1000 * 60 * 60 * 24));
@@ -551,7 +554,7 @@ export default function FinanceTab() {
                 }
             }
         }
-        // 4 de M+1 = URSSAF de M-1 (previous)
+        // 4 de M+1 = URSSAF de M-1 (previous) — chiffre réel uniquement
         if ((summary?.previous?.total_taxes || 0) > 0) {
             const m1 = new Date(now.getFullYear(), now.getMonth() + 1, 4);
             const diff1 = Math.floor((m1 - now) / (1000 * 60 * 60 * 24));
@@ -560,8 +563,8 @@ export default function FinanceTab() {
                 if (key in eventsByDate) eventsByDate[key] -= summary.previous.total_taxes;
             }
         }
-        // 4 de M+2 = URSSAF du mois courant (cur)
-        if ((cur.total_taxes || 0) > 0) {
+        // 4 de M+2 = URSSAF du mois courant (cur) — chiffre réel uniquement
+        if ((cur?.total_taxes || 0) > 0) {
             const m2 = new Date(now.getFullYear(), now.getMonth() + 2, 4);
             const diff2 = Math.floor((m2 - now) / (1000 * 60 * 60 * 24));
             if (diff2 >= 0 && diff2 <= HORIZON_DAYS) {
@@ -585,7 +588,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, summary, urssafNextOverride]);
+    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
