@@ -251,6 +251,22 @@ async def delete_pending_payment(payment_id: str, _=Depends(require_auth)):
     return {"deleted": True}
 
 
+class PendingCategoryUpdate(BaseModel):
+    category: str
+
+
+@api_router.patch("/finance/pending/{payment_id}")
+async def update_pending_payment(payment_id: str, body: PendingCategoryUpdate, _=Depends(require_auth)):
+    if body.category not in CATEGORIES:
+        raise HTTPException(status_code=400, detail="Catégorie invalide")
+    res = await db.pending_payments.update_one(
+        {"id": payment_id}, {"$set": {"category": body.category}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
+    return {"updated": True, "category": body.category}
+
+
 @api_router.post("/finance/pending/{payment_id}/confirm")
 async def confirm_pending_payment(payment_id: str, _=Depends(require_auth)):
     """Convertit un paiement en attente en écriture CA et supprime le pending."""

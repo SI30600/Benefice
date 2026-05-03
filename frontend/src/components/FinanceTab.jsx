@@ -210,6 +210,11 @@ export default function FinanceTab() {
         refresh();
     };
 
+    const updatePendingCategory = async (id, category) => {
+        await axios.patch(`${API}/finance/pending/${id}`, { category });
+        refresh();
+    };
+
     const addLbcPurchase = async () => {
         if (!lbcForm.amount || parseFloat(lbcForm.amount) <= 0) return;
         const platform = lbcForm.platform || "leboncoin";
@@ -1354,12 +1359,20 @@ export default function FinanceTab() {
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex flex-col min-w-0 flex-1">
                                                 <span className="text-sm text-white truncate">{p.client_name}</span>
-                                                <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono">
-                                                    {cat}
+                                                <span className="text-[9px] tracking-[0.15em] uppercase text-gray-500 font-mono flex items-center gap-2 flex-wrap">
+                                                    <select
+                                                        data-testid={`pending-cat-${p.id}`}
+                                                        value={cat}
+                                                        onChange={(e) => updatePendingCategory(p.id, e.target.value)}
+                                                        className="h-5 px-1 bg-[#0a0a0a] border border-[#333333] hover:border-yellow-500 text-[9px] tracking-[0.15em] uppercase font-mono text-gray-300 focus:outline-none focus:border-yellow-500 cursor-pointer"
+                                                    >
+                                                        <option value="materiel">Matériel</option>
+                                                        <option value="prestation">Prestation</option>
+                                                    </select>
                                                     {linkedAmount > 0 && (
                                                         <span
                                                             data-testid={`pending-linked-${p.id}`}
-                                                            className="ml-2 inline-flex items-center gap-1 text-yellow-400 normal-case tracking-normal"
+                                                            className="inline-flex items-center gap-1 text-yellow-400 normal-case tracking-normal"
                                                             title={`${linked.length} achat(s) lié(s) — sera déduit à l'encaissement`}
                                                         >
                                                             <Package className="h-3 w-3" />
