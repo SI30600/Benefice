@@ -80,6 +80,9 @@ Application de calcul de bénéfice net pour revente de pièces informatiques + 
 - **2026-04-30** : Plateforme "Autre" avec taxe + frais expédition manuels — testé E2E
 - **2026-04-30** : Placeholders "prix mini" transparents (CalcForm + AssemblyForm) couvrant achat + taxe + URSSAF 13.5% — testé E2E
 - **2026-04-30** : ResultPanel — libellé "Taxes plateformes" (LBC 5% + Autre) et "Livraison" agrégée (zone + expédition custom)
+- **2026-04-30** : Suppression de la ligne "Bénéfice brut" (inutile en franchise TVA micro-BIC)
+- **2026-05-03** : Achats en attente — choix plateforme (LBC/Vinted/eBay/...) + nom client
+- **2026-05-03** : Auto-conversion achat→`finance_entries.category=achat` lors de l'encaissement d'un paiement avec client_name identique → "dans ta poche" reflète la vraie marge nette (testé : 690€ encaissé − 332.69€ achat = 264.16€ in pocket)
 
 ### 🚧 Configuration Azure requise
 - App registration en single-tenant

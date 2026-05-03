@@ -254,7 +254,30 @@ async def confirm_pending_payment(payment_id: str, _=Depends(require_auth)):
     )
     await db.finance_entries.insert_one(entry.model_dump())
     await db.pending_payments.delete_one({"id": payment_id})
-    return {"encaisse": True, "entry": entry.model_dump()}
+
+    # Auto-convert LBC purchases matching same client_name into "achat" entries
+    linked_purchases = []
+    client_key = (doc.get("client_name") or "").strip().lower()
+    if client_key:
+        matching = await db.lbc_purchases.find(
+            {}, {"_id": 0}
+        ).to_list(500)
+        for lbc in matching:
+            if (lbc.get("client_name") or "").strip().lower() == client_key:
+                platform = lbc.get("platform") or "leboncoin"
+                achat_entry = FinanceEntry(
+                    date=datetime.now(timezone.utc).date().isoformat(),
+                    category="achat",
+                    amount=float(lbc.get("amount") or 0),
+                    description=f"Achat {platform} — {lbc.get('label') or ''} ({doc.get('client_name', '')})".strip(),
+                    client_name=doc.get("client_name", ""),
+                    source="lbc_auto",
+                )
+                await db.finance_entries.insert_one(achat_entry.model_dump())
+                await db.lbc_purchases.delete_one({"id": lbc["id"]})
+                linked_purchases.append(achat_entry.model_dump())
+
+    return {"encaisse": True, "entry": entry.model_dump(), "linked_purchases": linked_purchases}
 
 
 # ---- Finance: account balance ----------------------------------------------

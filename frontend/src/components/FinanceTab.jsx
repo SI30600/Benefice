@@ -109,7 +109,7 @@ export default function FinanceTab() {
         client_name: "",
     });
     const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "prestation" });
-    const [lbcForm, setLbcForm] = useState({ label: "", amount: "" });
+    const [lbcForm, setLbcForm] = useState({ label: "", amount: "", platform: "leboncoin", client_name: "" });
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
     const [prepareForm, setPrepareForm] = useState({ label: "", amount: "", note: "" });
@@ -212,11 +212,14 @@ export default function FinanceTab() {
 
     const addLbcPurchase = async () => {
         if (!lbcForm.amount || parseFloat(lbcForm.amount) <= 0) return;
+        const platform = lbcForm.platform || "leboncoin";
         await axios.post(`${API}/finance/lbc-purchases`, {
-            label: lbcForm.label || "Achat LBC",
+            label: lbcForm.label || `Achat ${platform}`,
             amount: parseFloat(lbcForm.amount),
+            platform,
+            client_name: lbcForm.client_name || "",
         });
-        setLbcForm({ label: "", amount: "" });
+        setLbcForm({ label: "", amount: "", platform: "leboncoin", client_name: "" });
         refresh();
     };
 
@@ -805,9 +808,35 @@ export default function FinanceTab() {
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
-                                Achats LBC en attente · {fmt(lbcList.total)} €
+                                Achats en attente · {fmt(lbcList.total)} €
                             </label>
-                            <div className="grid grid-cols-12 gap-2 mt-1.5 mb-2">
+                            <div className="grid grid-cols-12 gap-2 mt-1.5">
+                                <select
+                                    data-testid="lbc-purchase-platform"
+                                    value={lbcForm.platform}
+                                    onChange={(e) => setLbcForm({ ...lbcForm, platform: e.target.value })}
+                                    className="col-span-5 h-10 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-xs font-mono focus:outline-none"
+                                >
+                                    <option value="leboncoin">Leboncoin</option>
+                                    <option value="vinted">Vinted</option>
+                                    <option value="ebay">eBay</option>
+                                    <option value="rakuten">Rakuten</option>
+                                    <option value="amazon">Amazon</option>
+                                    <option value="facebook">Facebook MP</option>
+                                    <option value="particulier">Particulier</option>
+                                    <option value="magasin">Magasin</option>
+                                    <option value="autre">Autre</option>
+                                </select>
+                                <input
+                                    data-testid="lbc-purchase-client"
+                                    type="text"
+                                    value={lbcForm.client_name}
+                                    onChange={(e) => setLbcForm({ ...lbcForm, client_name: e.target.value })}
+                                    placeholder="Client (optionnel)"
+                                    className="col-span-7 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-xs font-mono focus:outline-none placeholder:text-gray-600"
+                                />
+                            </div>
+                            <div className="grid grid-cols-12 gap-2 mt-2 mb-2">
                                 <input
                                     data-testid="lbc-purchase-amount"
                                     type="number"
@@ -828,31 +857,51 @@ export default function FinanceTab() {
                                     Ajouter
                                 </button>
                             </div>
+                            <p className="text-[10px] text-gray-500 font-mono mb-2 leading-snug">
+                                💡 Si le nom client correspond à un paiement en attente, l'achat sera automatiquement déduit de "dans ta poche" lors de l'encaissement.
+                            </p>
 
                             {lbcList.items.length > 0 && (
                                 <div className="space-y-1 max-h-40 overflow-y-auto mb-3">
-                                    {lbcList.items.map((p, idx) => (
-                                        <div
-                                            key={p.id}
-                                            data-testid={`lbc-item-${p.id}`}
-                                            className="flex items-center justify-between gap-2 px-2 py-1.5 bg-[#0d0d0d] border border-[#222222]"
-                                        >
-                                            <span className="text-[10px] text-gray-500 font-mono shrink-0 w-6">
-                                                #{lbcList.items.length - idx}
-                                            </span>
-                                            <span className="font-mono text-sm font-bold text-red-400 flex-1 text-right">
-                                                {fmt(p.amount)} €
-                                            </span>
-                                            <button
-                                                data-testid={`lbc-delete-${p.id}`}
-                                                onClick={() => deleteLbcPurchase(p.id)}
-                                                className="text-gray-500 hover:text-red-500 transition-colors"
-                                                aria-label="Supprimer"
+                                    {lbcList.items.map((p, idx) => {
+                                        const plat = p.platform || "leboncoin";
+                                        const isLinked = p.client_name && pending.items.some(
+                                            (pp) => (pp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase()
+                                        );
+                                        return (
+                                            <div
+                                                key={p.id}
+                                                data-testid={`lbc-item-${p.id}`}
+                                                className={`flex items-center justify-between gap-2 px-2 py-1.5 bg-[#0d0d0d] border ${isLinked ? "border-yellow-500/40" : "border-[#222222]"}`}
                                             >
-                                                <Trash2 className="h-3 w-3" />
-                                            </button>
-                                        </div>
-                                    ))}
+                                                <span className="text-[10px] text-gray-500 font-mono shrink-0 w-6">
+                                                    #{lbcList.items.length - idx}
+                                                </span>
+                                                <span className="text-[9px] font-mono tracking-wider uppercase text-gray-400 shrink-0 px-1.5 py-0.5 border border-[#333333] bg-[#0a0a0a]">
+                                                    {plat}
+                                                </span>
+                                                {p.client_name && (
+                                                    <span
+                                                        className={`text-[10px] font-mono truncate ${isLinked ? "text-yellow-400" : "text-gray-500"}`}
+                                                        title={isLinked ? "Lié à un paiement en attente" : ""}
+                                                    >
+                                                        {isLinked ? "🔗 " : ""}{p.client_name}
+                                                    </span>
+                                                )}
+                                                <span className="font-mono text-sm font-bold text-red-400 flex-1 text-right">
+                                                    {fmt(p.amount)} €
+                                                </span>
+                                                <button
+                                                    data-testid={`lbc-delete-${p.id}`}
+                                                    onClick={() => deleteLbcPurchase(p.id)}
+                                                    className="text-gray-500 hover:text-red-500 transition-colors"
+                                                    aria-label="Supprimer"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                             {balance.updated_at && (
@@ -873,7 +922,7 @@ export default function FinanceTab() {
                                 <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 30 prochains jours</div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
-                                <div className="flex justify-between"><span className="text-gray-400">− Achats LBC en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">− Achats en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prochaine URSSAF</span><span className="text-red-400">−{fmt(parseFloat(urssafNextOverride) || summary?.previous?.total_taxes || 0)} €</span></div>
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">

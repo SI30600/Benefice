@@ -66,12 +66,16 @@ class LbcPurchase(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     label: str
     amount: float
+    platform: str = "leboncoin"
+    client_name: str = ""
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class LbcPurchaseCreate(BaseModel):
     label: str
     amount: float
+    platform: str = "leboncoin"
+    client_name: str = ""
 
 
 class MonthlyCharge(BaseModel):
