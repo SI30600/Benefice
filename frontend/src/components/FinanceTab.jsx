@@ -71,17 +71,16 @@ export default function FinanceTab() {
     const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
     const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
-    // URSSAF à payer le 4 de M+1 : override manuel valable uniquement pour le mois courant
-    // Format localStorage: "YYYY-MM|montant" — dès qu'on change de mois, l'override expire
+    // URSSAF à payer le 4 de chaque mois — override manuel persistant jusqu'à consommation
+    // Format localStorage: "CYCLE|montant" où CYCLE = YYYY-MM du prélèvement
+    // Nettoyé automatiquement lors de l'appel à handleUrssaf (consume/skip)
     const [urssafNextOverride, setUrssafNextOverride] = useState(() => {
         try {
             const raw = localStorage.getItem("urssaf_next_override") || "";
             if (!raw) return "";
-            // Legacy : anciennes valeurs sans préfixe mois — on les considère expirées
-            if (!raw.includes("|")) return "";
-            const [savedMonth, val] = raw.split("|");
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            return savedMonth === currentMonth ? val : "";
+            if (!raw.includes("|")) return raw; // legacy : valeur sans préfixe
+            const [, val] = raw.split("|");
+            return val || "";
         } catch { return ""; }
     });
 
@@ -90,8 +89,9 @@ export default function FinanceTab() {
             if (!val || parseFloat(val) <= 0) {
                 localStorage.removeItem("urssaf_next_override");
             } else {
-                const currentMonth = new Date().toISOString().slice(0, 7);
-                localStorage.setItem("urssaf_next_override", `${currentMonth}|${val}`);
+                // On préfixe par la date pour traçabilité mais l'expiry est désactivé
+                const today = new Date().toISOString().slice(0, 10);
+                localStorage.setItem("urssaf_next_override", `${today}|${val}`);
             }
         } catch {
             // localStorage unavailable
