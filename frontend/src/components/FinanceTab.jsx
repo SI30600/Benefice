@@ -108,7 +108,7 @@ export default function FinanceTab() {
         description: "",
         client_name: "",
     });
-    const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "prestation" });
+    const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "materiel" });
     const [lbcForm, setLbcForm] = useState({ label: "", amount: "", platform: "leboncoin", client_name: "" });
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
@@ -194,9 +194,9 @@ export default function FinanceTab() {
             client_name: pendingForm.client_name,
             amount: parseFloat(pendingForm.amount),
             note: pendingForm.note || "",
-            category: pendingForm.category || "prestation",
+            category: pendingForm.category || "materiel",
         });
-        setPendingForm({ client_name: "", amount: "", note: "", category: "prestation" });
+        setPendingForm({ client_name: "", amount: "", note: "", category: "materiel" });
         refresh();
     };
 
@@ -1311,8 +1311,8 @@ export default function FinanceTab() {
                             onChange={(e) => setPendingForm({ ...pendingForm, category: e.target.value })}
                             className="col-span-3 h-11 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-[11px] font-mono focus:outline-none"
                         >
-                            <option value="prestation">Prestation</option>
                             <option value="materiel">Matériel</option>
+                            <option value="prestation">Prestation</option>
                         </select>
                         <button
                             data-testid="pending-add"
