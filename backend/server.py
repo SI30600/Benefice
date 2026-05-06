@@ -287,6 +287,14 @@ async def confirm_pending_payment(payment_id: str, _=Depends(require_auth)):
     await db.finance_entries.insert_one(entry.model_dump())
     await db.pending_payments.delete_one({"id": payment_id})
 
+    # Mise à jour du solde réel : on ajoute le montant encaissé
+    encaissed_amount = float(doc.get("amount") or 0)
+    await db.account_balance.update_one(
+        {"_id": BALANCE_DOC_ID},
+        {"$inc": {"balance": encaissed_amount}, "$set": {"updated_at": now_iso()}},
+        upsert=True,
+    )
+
     # Auto-convert LBC purchases matching same client_name into "achat" entries
     # Mais SEULEMENT si le pending encaissé est "materiel" (les prestations n'ont pas d'achat associé)
     linked_purchases = []
