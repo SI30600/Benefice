@@ -454,15 +454,12 @@ export default function FinanceTab() {
         for (let offset = 0; offset <= 2; offset++) {
             const payDate = new Date(today.getFullYear(), today.getMonth() + offset, 4);
             const diff = Math.floor((payDate - today) / (1000 * 60 * 60 * 24));
-            // Toujours inclure le cycle du mois courant (offset 0) s'il n'est pas encore traité
-            // Pour M+1, M+2 : doit être dans la fenêtre future (0..PREV_HORIZON)
             if (diff > PREV_HORIZON) continue;
             if (offset > 0 && diff < 0) continue;
 
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
 
-            // Source = M-1 relative to the payment month
             const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 1, 1);
             const sourceMonth = `${srcDate.getFullYear()}-${String(srcDate.getMonth() + 1).padStart(2, "0")}`;
 
@@ -470,12 +467,11 @@ export default function FinanceTab() {
             if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
             else if (sourceMonth === summary?.month) autoAmount = summary?.current?.total_taxes || 0;
 
-            // Override s'applique uniquement au premier cycle non traité (le plus imminent)
             const isFirstShown = items.length === 0;
             const amount = isFirstShown && overrideVal > 0 ? overrideVal : autoAmount;
 
             if (amount > 0) {
-                items.push({ cycle, sourceMonth, amount, payDate: payDate.toISOString().slice(0, 10) });
+                items.push({ cycle, sourceMonth, amount, autoAmount, payDate: payDate.toISOString().slice(0, 10) });
             }
         }
         return items;
@@ -995,7 +991,7 @@ export default function FinanceTab() {
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") saveUrssafOverride(urssafNextOverride);
                                     }}
-                                    placeholder={nextUrssaf.amount ? `auto : ${fmt(nextUrssaf.amount)}` : "Ex: 483"}
+                                    placeholder={nextUrssaf.autoAmount ? `auto : ${fmt(nextUrssaf.autoAmount)}` : "Ex: 483"}
                                     className="flex-1 h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-orange-500 text-orange-400 text-lg font-mono font-bold focus:outline-none"
                                 />
                                 <button
@@ -1005,11 +1001,21 @@ export default function FinanceTab() {
                                 >
                                     OK
                                 </button>
+                                {urssafNextOverride && (
+                                    <button
+                                        data-testid="urssaf-next-clear"
+                                        onClick={() => { setUrssafNextOverride(""); saveUrssafOverride(""); }}
+                                        className="px-2 bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#333333] text-gray-400 text-[10px] tracking-[0.15em] uppercase font-mono"
+                                        title="Vider l'override et utiliser l'auto-calcul"
+                                    >
+                                        ×
+                                    </button>
+                                )}
                             </div>
                             <div className="text-[9px] text-gray-500 font-mono mb-3">
                                 {urssafNextOverride
-                                    ? `Valeur manuelle (${monthLabel(month).split(" ")[0]}) · auto : ${fmt(nextUrssaf.amount)} €`
-                                    : `Auto-calcul depuis CA ${nextUrssaf.sourceMonth ? monthLabel(nextUrssaf.sourceMonth) : "M-1"} (${fmt(nextUrssaf.amount)} €)`}
+                                    ? `Valeur manuelle · auto depuis CA ${nextUrssaf.sourceMonth ? monthLabel(nextUrssaf.sourceMonth).split(" ")[0] : "M-1"} : ${fmt(nextUrssaf.autoAmount || 0)} €`
+                                    : `Auto-calcul depuis CA ${nextUrssaf.sourceMonth ? monthLabel(nextUrssaf.sourceMonth) : "M-1"} (${fmt(nextUrssaf.autoAmount || 0)} €)`}
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
