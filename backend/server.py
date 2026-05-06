@@ -440,6 +440,10 @@ async def import_subscriptions(month: Optional[str] = None, _=Depends(require_au
     revenues = await db.recurring_revenues.find({}, {"_id": 0}).to_list(500)
     imported, skipped = [], []
     for r in revenues:
+        # Les abos prépayés (déjà encaissés à l'année) ne sont pas réimportés chaque mois
+        if r.get("prepaid"):
+            skipped.append(r.get("id"))
+            continue
         sub_id = r.get("id")
         if not sub_id:
             continue
