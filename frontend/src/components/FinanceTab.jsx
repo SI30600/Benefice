@@ -22,11 +22,11 @@ const monthLabel = (yyyymm) => {
     return dt.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 };
 
-// Retourne YYYY-MM du mois M+1 (mois de prélèvement URSSAF pour un CA donné, décalage 1 mois)
+// Retourne YYYY-MM du mois M+2 (mois de prélèvement URSSAF pour un CA donné, décalage 2 mois)
 const nextMonth = (yyyymm) => {
     if (!yyyymm) return "";
     const [y, m] = yyyymm.split("-");
-    const dt = new Date(Number(y), Number(m) - 1 + 1, 1);
+    const dt = new Date(Number(y), Number(m) - 1 + 2, 1);
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
 };
 
@@ -426,8 +426,7 @@ export default function FinanceTab() {
         }
     }, [urssafPrompt.show, urssafPrompt.suggestedAmount, urssafPromptAmount]);
 
-    // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-1 (décalage 1 mois)
-    // Inclut le cycle du mois courant même si on est passé le 4 (tant que non traité)
+    // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-2 (décalage 2 mois)
     const upcomingUrssaf = useMemo(() => {
         const today = new Date();
         const handled = balance.urssaf_handled_cycles || [];
@@ -437,24 +436,22 @@ export default function FinanceTab() {
         for (let offset = 0; offset <= 2; offset++) {
             const payDate = new Date(today.getFullYear(), today.getMonth() + offset, 4);
             const diff = Math.floor((payDate - today) / (1000 * 60 * 60 * 24));
-            // Le cycle du mois courant (offset 0) reste affiché même passé le 4, jusqu'au clic ×
-            // Pour M+1 et M+2 : doivent être dans la fenêtre future (0..PREV_HORIZON)
             if (diff > PREV_HORIZON) continue;
             if (offset > 0 && diff < 0) continue;
 
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
 
-            const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 1, 1);
+            // Source = M-2 relative to the payment month
+            const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 2, 1);
             const sourceMonth = `${srcDate.getFullYear()}-${String(srcDate.getMonth() + 1).padStart(2, "0")}`;
 
             let autoAmount = 0;
-            if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
+            if (sourceMonth === summary?.prev_prev_month) autoAmount = summary?.prev_prev?.total_taxes || 0;
+            else if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
             else if (sourceMonth === summary?.month) autoAmount = summary?.current?.total_taxes || 0;
 
             const isFirstShown = items.length === 0;
-            // L'override manuel ne s'applique QUE si l'auto-calcul est 0 (CA non encore déclaré)
-            // Dès qu'un CA réel existe, c'est lui qui prime — l'override est ignoré silencieusement
             const amount = (isFirstShown && autoAmount === 0 && overrideVal > 0) ? overrideVal : autoAmount;
 
             if (amount > 0) {
@@ -559,33 +556,39 @@ export default function FinanceTab() {
             }
         });
 
-        // URSSAF : prélèvement le 4 de chaque mois avec décalage de 1 mois (CA M → paiement 4 de M+1)
-        // Pas d'estimatif : seuls les vrais CA saisis sont utilisés. L'override s'applique UNIQUEMENT
-        // au prochain prélèvement immédiat (quand le CA source n'est pas encore déclaré).
+        // URSSAF : prélèvement le 4 de chaque mois avec décalage de 2 mois (CA M → paiement 4 de M+2)
         const handled = balance.urssaf_handled_cycles || [];
         const overrideVal = parseFloat(urssafNextOverride) || 0;
 
-        // 4 du mois courant = URSSAF de M-1 (previous) — si pas encore traitée, peut utiliser l'override
+        // 4 du mois courant = URSSAF de M-2 (prev_prev) — si pas encore traitée
         // Si la date est passée (cycle non traité), on place le prélèvement à aujourd'hui pour qu'il reste visible
         const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         if (!handled.find((h) => h.cycle === curCycle)) {
-            const auto = summary?.previous?.total_taxes || 0;
+            const auto = summary?.prev_prev?.total_taxes || 0;
             const amt = auto > 0 ? auto : (overrideVal > 0 ? overrideVal : 0);
             if (amt > 0) {
                 const m0 = new Date(now.getFullYear(), now.getMonth(), 4);
                 const diff0 = Math.floor((m0 - now) / (1000 * 60 * 60 * 24));
-                // Si dans le futur (avant le 4) → date du 4. Sinon (passé le 4 mais non traité) → aujourd'hui
                 const targetDate = diff0 >= 0 ? m0 : now;
                 const key = targetDate.toISOString().slice(0, 10);
                 if (key in eventsByDate) eventsByDate[key] -= amt;
             }
         }
-        // 4 de M+1 = URSSAF du mois courant (cur) — chiffre réel uniquement
-        if ((cur?.total_taxes || 0) > 0) {
+        // 4 de M+1 = URSSAF de M-1 (previous) — chiffre réel uniquement
+        if ((summary?.previous?.total_taxes || 0) > 0) {
             const m1 = new Date(now.getFullYear(), now.getMonth() + 1, 4);
             const diff1 = Math.floor((m1 - now) / (1000 * 60 * 60 * 24));
             if (diff1 >= 0 && diff1 <= HORIZON_DAYS) {
                 const key = m1.toISOString().slice(0, 10);
+                if (key in eventsByDate) eventsByDate[key] -= summary.previous.total_taxes;
+            }
+        }
+        // 4 de M+2 = URSSAF du mois courant (cur) — chiffre réel uniquement
+        if ((cur?.total_taxes || 0) > 0) {
+            const m2 = new Date(now.getFullYear(), now.getMonth() + 2, 4);
+            const diff2 = Math.floor((m2 - now) / (1000 * 60 * 60 * 24));
+            if (diff2 >= 0 && diff2 <= HORIZON_DAYS) {
+                const key = m2.toISOString().slice(0, 10);
                 if (key in eventsByDate) eventsByDate[key] -= cur.total_taxes;
             }
         }
