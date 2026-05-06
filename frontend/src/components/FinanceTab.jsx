@@ -436,8 +436,9 @@ export default function FinanceTab() {
         for (let offset = 0; offset <= 2; offset++) {
             const payDate = new Date(today.getFullYear(), today.getMonth() + offset, 4);
             const diff = Math.floor((payDate - today) / (1000 * 60 * 60 * 24));
-            if (diff > PREV_HORIZON) continue;
-            if (offset > 0 && diff < 0) continue;
+            // Ne garde que les prélèvements à venir : passé le 4, le cycle est considéré payé,
+            // la ligne suivante (cycle M+1) prend automatiquement la place de "Dernier URSSAF"
+            if (diff < 0 || diff > PREV_HORIZON) continue;
 
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
@@ -560,8 +561,7 @@ export default function FinanceTab() {
         const handled = balance.urssaf_handled_cycles || [];
         const overrideVal = parseFloat(urssafNextOverride) || 0;
 
-        // 4 du mois courant = URSSAF de M-2 (prev_prev) — si pas encore traitée
-        // Si la date est passée (cycle non traité), on place le prélèvement à aujourd'hui pour qu'il reste visible
+        // 4 du mois courant = URSSAF de M-2 (prev_prev) — uniquement si le 4 n'est pas encore passé
         const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         if (!handled.find((h) => h.cycle === curCycle)) {
             const auto = summary?.prev_prev?.total_taxes || 0;
@@ -569,9 +569,10 @@ export default function FinanceTab() {
             if (amt > 0) {
                 const m0 = new Date(now.getFullYear(), now.getMonth(), 4);
                 const diff0 = Math.floor((m0 - now) / (1000 * 60 * 60 * 24));
-                const targetDate = diff0 >= 0 ? m0 : now;
-                const key = targetDate.toISOString().slice(0, 10);
-                if (key in eventsByDate) eventsByDate[key] -= amt;
+                if (diff0 >= 0 && diff0 <= HORIZON_DAYS) {
+                    const key = m0.toISOString().slice(0, 10);
+                    if (key in eventsByDate) eventsByDate[key] -= amt;
+                }
             }
         }
         // 4 de M+1 = URSSAF de M-1 (previous) — chiffre réel uniquement
