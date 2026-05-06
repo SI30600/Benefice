@@ -1115,14 +1115,6 @@ export default function FinanceTab() {
                                             </span>
                                             <span className="flex items-center gap-1.5">
                                                 <span className="text-red-400">−{fmt(u.amount)} €</span>
-                                                <button
-                                                    data-testid={`urssaf-skip-${idx}`}
-                                                    onClick={() => handleUrssaf(u.cycle, u.amount, "skip", u.sourceMonth)}
-                                                    className="text-gray-600 hover:text-yellow-500 text-[11px] leading-none px-1 transition-colors"
-                                                    title="Déjà intégrée au solde réel — retirer de la prévision"
-                                                >
-                                                    ×
-                                                </button>
                                             </span>
                                         </div>
                                     ))
