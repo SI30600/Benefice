@@ -444,18 +444,20 @@ export default function FinanceTab() {
     }, [urssafPrompt.show, urssafPrompt.suggestedAmount, urssafPromptAmount]);
 
     // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-1 (décalage 1 mois)
-    // Retourne la liste des prélèvements à venir dans la fenêtre PREV_HORIZON jours (max 3)
+    // Inclut le cycle du mois courant même si on est passé le 4 (tant que non traité)
     const upcomingUrssaf = useMemo(() => {
         const today = new Date();
         const handled = balance.urssaf_handled_cycles || [];
         const overrideVal = parseFloat(urssafNextOverride) || 0;
         const items = [];
 
-        // Tester jusqu'à 3 cycles : ce mois, M+1, M+2
         for (let offset = 0; offset <= 2; offset++) {
             const payDate = new Date(today.getFullYear(), today.getMonth() + offset, 4);
             const diff = Math.floor((payDate - today) / (1000 * 60 * 60 * 24));
-            if (diff < 0 || diff > PREV_HORIZON) continue;
+            // Toujours inclure le cycle du mois courant (offset 0) s'il n'est pas encore traité
+            // Pour M+1, M+2 : doit être dans la fenêtre future (0..PREV_HORIZON)
+            if (diff > PREV_HORIZON) continue;
+            if (offset > 0 && diff < 0) continue;
 
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
@@ -464,7 +466,6 @@ export default function FinanceTab() {
             const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 1, 1);
             const sourceMonth = `${srcDate.getFullYear()}-${String(srcDate.getMonth() + 1).padStart(2, "0")}`;
 
-            // Map source month to the right summary bucket
             let autoAmount = 0;
             if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
             else if (sourceMonth === summary?.month) autoAmount = summary?.current?.total_taxes || 0;
@@ -491,6 +492,17 @@ export default function FinanceTab() {
         return { cycle, sourceMonth: summary?.previous_month || "", amount: 0 };
     }, [upcomingUrssaf, summary]);
 
+    // URSSAF en cours : taxes accumulées sur le CA du mois courant (sera prélevée le 4 de M+1)
+    const currentMonthUrssaf = useMemo(() => +(cur?.total_taxes || 0).toFixed(2), [cur]);
+
+    // Évite le double comptage si le 4 de M+1 est déjà dans upcomingUrssaf (fenêtre 35j)
+    const currentMonthInUpcoming = useMemo(() => {
+        if (!summary?.month) return false;
+        return upcomingUrssaf.some((u) => u.sourceMonth === summary.month);
+    }, [upcomingUrssaf, summary]);
+
+    const extraCurrentMonthUrssaf = currentMonthInUpcoming ? 0 : currentMonthUrssaf;
+
     const totalUpcomingUrssaf = useMemo(
         () => upcomingUrssaf.reduce((s, u) => s + u.amount, 0),
         [upcomingUrssaf]
@@ -505,11 +517,12 @@ export default function FinanceTab() {
             + pending.total
             + revenuesUpcomingTotal
             - totalUpcomingUrssaf
+            - extraCurrentMonthUrssaf
             - cb
             - lbcList.total
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf]);
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -883,64 +896,7 @@ export default function FinanceTab() {
                         <SectionCard>
                             <SectionTitle icon={Wallet}>État du compte</SectionTitle>
 
-                            {/* URSSAF auto-deduction prompt */}
-                            {urssafPrompt.show && (
-                                <div
-                                    data-testid="urssaf-prompt-banner"
-                                    className="mb-4 border border-yellow-500/50 bg-yellow-500/5 p-3"
-                                >
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-[10px] tracking-[0.2em] uppercase font-mono text-yellow-500 font-bold">
-                                            ⚠ URSSAF prélevée le 4 {monthLabel(urssafPrompt.cycle).split(" ")[0]}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-gray-300 font-mono mb-2 leading-relaxed">
-                                        Montant prélevé sur le compte (basé sur CA de{" "}
-                                        <span className="text-yellow-400">
-                                            {monthLabel(urssafPrompt.sourceMonth)}
-                                        </span>
-                                        ) :
-                                    </p>
-                                    <div className="flex gap-2 mb-2">
-                                        <input
-                                            data-testid="urssaf-prompt-amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={urssafPromptAmount}
-                                            onChange={(e) => setUrssafPromptAmount(e.target.value)}
-                                            className="flex-1 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-500 text-base font-mono font-bold focus:outline-none"
-                                        />
-                                        <span className="self-center font-mono text-yellow-500 text-lg font-bold">€</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button
-                                            data-testid="urssaf-prompt-consume"
-                                            onClick={() => handleUrssaf(urssafPrompt.cycle, urssafPromptAmount, "consume", urssafPrompt.sourceMonth)}
-                                            className="h-9 bg-red-600 hover:bg-red-500 text-white text-[9px] tracking-[0.12em] uppercase font-mono font-semibold"
-                                            title="Déduire ce montant du Solde réel"
-                                        >
-                                            Déduire du solde
-                                        </button>
-                                        <button
-                                            data-testid="urssaf-prompt-skip"
-                                            onClick={() => handleUrssaf(urssafPrompt.cycle, urssafPromptAmount, "skip", urssafPrompt.sourceMonth)}
-                                            className="h-9 bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#333333] text-gray-300 text-[9px] tracking-[0.12em] uppercase font-mono"
-                                            title="Déjà déduit manuellement — marquer le cycle comme traité"
-                                        >
-                                            Déjà fait
-                                        </button>
-                                        <button
-                                            data-testid="urssaf-prompt-not-yet"
-                                            onClick={() => { setUrssafPromptAmount(""); }}
-                                            className="h-9 bg-transparent border border-[#333333] hover:border-yellow-500 text-gray-400 hover:text-yellow-500 text-[9px] tracking-[0.12em] uppercase font-mono"
-                                            title="Je vérifierai plus tard"
-                                        >
-                                            Pas encore
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Banner URSSAF retirée — gestion via la liste "Sur 35 prochains jours" et bouton × */}
 
                             {/* Undo banner — show if URSSAF was recently auto-deducted */}
                             {urssafPrompt.showUndo && urssafPrompt.handled?.action === "consume" && (
@@ -1202,6 +1158,17 @@ export default function FinanceTab() {
                                             </span>
                                         </div>
                                     ))
+                                )}
+                                {extraCurrentMonthUrssaf > 0 && (
+                                    <div className="flex justify-between" data-testid="urssaf-current-accruing">
+                                        <span className="text-gray-400">
+                                            − URSSAF en cours
+                                            <span className="text-gray-600 text-[10px] ml-1">
+                                                (CA {monthLabel(summary?.month || "").split(" ")[0]})
+                                            </span>
+                                        </span>
+                                        <span className="text-red-400">−{fmt(extraCurrentMonthUrssaf)} €</span>
+                                    </div>
                                 )}
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
