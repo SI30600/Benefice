@@ -439,6 +439,14 @@ async def import_subscriptions(month: Optional[str] = None, _=Depends(require_au
 
     # Liste des abonnements à exclure de l'import mensuel (prépayés annuels, hors récurrent)
     EXCLUDED_LABELS = {"molto"}
+    # Liste des abos pour lesquels la commission GoCardless Advanced doit être déduite
+    # (abos dont le montant en BD est encore le brut — pour les autres c'est déjà ajusté)
+    GC_FEE_LABELS = {"somnum"}
+
+    def _gc_fee(amt: float) -> float:
+        if amt <= 0:
+            return 0.0
+        return min(2.5, round(amt * 0.0125 + 0.2, 2))
 
     revenues = await db.recurring_revenues.find({}, {"_id": 0}).to_list(500)
     imported, skipped = [], []
@@ -462,17 +470,22 @@ async def import_subscriptions(month: Optional[str] = None, _=Depends(require_au
             entry_date = f"{month}-{day:02d}"
         except Exception:
             entry_date = f"{month}-01"
+        gross = float(r.get("amount") or 0)
+        apply_gc = any(g in label_norm for g in GC_FEE_LABELS)
+        fee = _gc_fee(gross) if apply_gc else 0.0
+        net = round(gross - fee, 2)
+        desc_suffix = f" (net après commission GC −{fee:.2f}€)" if fee > 0 else ""
         entry = {
             "id": det_id,
             "date": entry_date,
             "category": "prestation",
-            "amount": float(r.get("amount") or 0),
-            "description": f"Abonnement mensuel — {r.get('label', '')}".strip(),
+            "amount": net,
+            "description": f"Abonnement mensuel — {r.get('label', '')}".strip() + desc_suffix,
             "client_name": r.get("label", ""),
             "source": "subscription",
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        await db.finance_entries.insert_one(entry)
+        await db.finance_entries.insert_one(dict(entry))
         imported.append(entry)
     return {"imported": len(imported), "skipped": len(skipped), "month": month, "items": imported}
 

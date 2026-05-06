@@ -30,11 +30,24 @@ const nextMonth = (yyyymm) => {
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const SectionCard = ({ children, className = "" }) => (
-    <div className={`bg-[#111111] border border-[#262626] p-5 md:p-6 ${className}`}>
+const SectionCard = ({ children, className = "", id }) => (
+    <div id={id} className={`bg-[#111111] border border-[#262626] p-5 md:p-6 ${className}`}>
         {children}
     </div>
 );
+
+// GoCardless commission Advanced plan SEPA France : 1,25% + 0,20€ plafonné 2,50€
+const GC_CLIENTS = ["jlp", "air edition", "air édition", "somnum"];
+const isGoCardlessClient = (name) => {
+    const n = (name || "").trim().toLowerCase();
+    if (!n) return false;
+    return GC_CLIENTS.some((c) => n.includes(c));
+};
+const gocardlessFee = (amount) => {
+    const a = parseFloat(amount) || 0;
+    if (a <= 0) return 0;
+    return Math.min(2.5, +(a * 0.0125 + 0.2).toFixed(2));
+};
 
 const SectionTitle = ({ icon: Icon, children, accent }) => (
     <div className="flex items-center gap-2 mb-4">
@@ -160,35 +173,38 @@ export default function FinanceTab() {
     const addEntry = async () => {
         const total = parseFloat(entryForm.amount);
         if (!entryForm.amount || total <= 0) return;
+        // Si client GoCardless → déduit la commission Advanced (1.25% + 0.20€, plafonné 2.50€)
+        const gcFee = isGoCardlessClient(entryForm.client_name) ? gocardlessFee(total) : 0;
+        const netTotal = +(total - gcFee).toFixed(2);
+        const gcSuffix = gcFee > 0 ? ` (net après commission GC −${gcFee.toFixed(2)}€)` : "";
         if (splitForm.enabled) {
             const presta = parseFloat(splitForm.prestaAmount) || 0;
-            const mat = +(total - presta).toFixed(2);
+            const mat = +(netTotal - presta).toFixed(2);
             if (presta <= 0 || mat <= 0) return;
             await axios.post(`${API}/finance/entries`, {
                 date: entryForm.date,
                 category: "prestation",
                 amount: presta,
-                description: entryForm.description,
+                description: (entryForm.description || "") + gcSuffix,
                 client_name: entryForm.client_name,
             });
             await axios.post(`${API}/finance/entries`, {
                 date: entryForm.date,
                 category: "materiel",
                 amount: mat,
-                description: entryForm.description,
+                description: (entryForm.description || "") + gcSuffix,
                 client_name: entryForm.client_name,
             });
             setSplitForm({ enabled: false, prestaAmount: "" });
         } else {
-            // Catégorie "autre" : on remappe vers presta ou matériel selon le taux choisi
             const realCategory = entryForm.category === "autre"
                 ? (entryForm.autreRate || "prestation")
                 : entryForm.category;
             await axios.post(`${API}/finance/entries`, {
                 date: entryForm.date,
                 category: realCategory,
-                amount: total,
-                description: entryForm.description,
+                amount: netTotal,
+                description: (entryForm.description || "") + gcSuffix,
                 client_name: entryForm.client_name,
             });
         }
@@ -1264,6 +1280,24 @@ export default function FinanceTab() {
                             placeholder="Description / note (optionnel)"
                             className="w-full h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
                         />
+
+                        {/* GoCardless commission preview (auto déduite à l'enregistrement) */}
+                        {isGoCardlessClient(entryForm.client_name) && parseFloat(entryForm.amount) > 0 && (
+                            <div
+                                data-testid="entry-gc-preview"
+                                className="flex items-center justify-between px-3 py-2 border border-purple-500/40 bg-purple-500/5 text-[10px] font-mono"
+                            >
+                                <span className="text-purple-300 tracking-wider">
+                                    💳 Commission GoCardless Advanced sera déduite
+                                </span>
+                                <span className="text-purple-400">
+                                    −{fmt(gocardlessFee(entryForm.amount))} € →
+                                    <span className="text-yellow-400 font-bold ml-1">
+                                        net : {fmt((parseFloat(entryForm.amount) || 0) - gocardlessFee(entryForm.amount))} €
+                                    </span>
+                                </span>
+                            </div>
+                        )}
 
                         {/* Split Matériel / Prestation : toggle puis montant presta à extraire */}
                         <div className="border border-[#333333] bg-[#0a0a0a] p-2.5">
