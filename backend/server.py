@@ -427,6 +427,48 @@ async def delete_recurring_revenue(revenue_id: str, _=Depends(require_auth)):
     return {"deleted": True}
 
 
+@api_router.post("/finance/import-subscriptions")
+async def import_subscriptions(month: Optional[str] = None, _=Depends(require_auth)):
+    """Crée pour le mois donné les écritures CA manquantes correspondant aux abonnements clients.
+    Utilise un id déterministe `sub-{revenue_id}-{YYYY-MM}` : pas de doublon si déjà importé.
+    Si l'utilisateur supprime ensuite l'écriture, un nouvel import la recréera."""
+    if not month:
+        month = datetime.now(timezone.utc).date().isoformat()[:7]
+    if len(month) != 7 or month[4] != "-":
+        raise HTTPException(status_code=400, detail="Format mois invalide (YYYY-MM)")
+
+    revenues = await db.recurring_revenues.find({}, {"_id": 0}).to_list(500)
+    imported, skipped = [], []
+    for r in revenues:
+        sub_id = r.get("id")
+        if not sub_id:
+            continue
+        det_id = f"sub-{sub_id}-{month}"
+        existing = await db.finance_entries.find_one({"id": det_id}, {"_id": 0})
+        if existing:
+            skipped.append(det_id)
+            continue
+        # Date de l'écriture = jour du mois de l'abo (clamp si dépasse, ex: 31 en février)
+        day = max(1, min(28, int(r.get("day_of_month") or 1)))
+        try:
+            entry_date = f"{month}-{day:02d}"
+        except Exception:
+            entry_date = f"{month}-01"
+        entry = {
+            "id": det_id,
+            "date": entry_date,
+            "category": "prestation",
+            "amount": float(r.get("amount") or 0),
+            "description": f"Abonnement mensuel — {r.get('label', '')}".strip(),
+            "client_name": r.get("label", ""),
+            "source": "subscription",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.finance_entries.insert_one(entry)
+        imported.append(entry)
+    return {"imported": len(imported), "skipped": len(skipped), "month": month, "items": imported}
+
+
 # ---- Finance: payments to prepare ------------------------------------------
 
 @api_router.post("/finance/payments-to-prepare", response_model=PaymentToPrepare)

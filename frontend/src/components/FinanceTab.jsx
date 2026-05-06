@@ -2194,25 +2194,43 @@ export default function FinanceTab() {
                             Saisies du mois · {entries.length} ligne{entries.length > 1 ? "s" : ""}
                         </span>
                     </div>
-                    <button
-                        data-testid="entry-form-scroll"
-                        type="button"
-                        onClick={() => {
-                            const el = document.getElementById("entry-form-anchor");
-                            if (el) {
-                                el.scrollIntoView({ behavior: "smooth", block: "start" });
-                                setTimeout(() => {
-                                    const dateInput = document.querySelector("[data-testid='entry-date']");
-                                    if (dateInput) dateInput.focus();
-                                }, 400);
-                            }
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 h-8 bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-yellow-400 transition-colors"
-                        title="Aller au formulaire de saisie manuelle"
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        Nouvelle saisie
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            data-testid="entry-import-subs"
+                            type="button"
+                            onClick={async () => {
+                                const res = await axios.post(`${API}/finance/import-subscriptions?month=${month}`);
+                                refresh();
+                                const n = res.data?.imported || 0;
+                                const s = res.data?.skipped || 0;
+                                alert(n > 0 ? `✓ ${n} abonnement(s) importé(s) ce mois${s ? ` · ${s} déjà présent(s)` : ""}` : "Tous les abonnements sont déjà importés pour ce mois");
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 h-8 bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#333333] hover:border-yellow-500 text-gray-300 text-[10px] tracking-[0.15em] uppercase font-mono transition-colors"
+                            title="Importer les abonnements clients comme saisies du mois (sans doublon)"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Importer abos
+                        </button>
+                        <button
+                            data-testid="entry-form-scroll"
+                            type="button"
+                            onClick={() => {
+                                const el = document.getElementById("entry-form-anchor");
+                                if (el) {
+                                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    setTimeout(() => {
+                                        const dateInput = document.querySelector("[data-testid='entry-date']");
+                                        if (dateInput) dateInput.focus();
+                                    }, 400);
+                                }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 h-8 bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold hover:bg-yellow-400 transition-colors"
+                            title="Aller au formulaire de saisie manuelle"
+                        >
+                            <Plus className="h-3.5 w-3.5" />
+                            Nouvelle saisie
+                        </button>
+                    </div>
                 </div>
                 {entries.length === 0 ? (
                     <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed flex items-center justify-center gap-2">
