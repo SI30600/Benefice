@@ -185,6 +185,33 @@ async def delete_finance_entry(entry_id: str, _=Depends(require_auth)):
     return {"deleted": True}
 
 
+class EntryUpdate(BaseModel):
+    amount: Optional[float] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+
+
+@api_router.patch("/finance/entries/{entry_id}")
+async def update_finance_entry(entry_id: str, body: EntryUpdate, _=Depends(require_auth)):
+    update = {}
+    if body.amount is not None:
+        if body.amount < 0:
+            raise HTTPException(status_code=400, detail="Montant invalide")
+        update["amount"] = float(body.amount)
+    if body.description is not None:
+        update["description"] = body.description
+    if body.category is not None:
+        if body.category not in CATEGORIES:
+            raise HTTPException(status_code=400, detail="Catégorie invalide")
+        update["category"] = body.category
+    if not update:
+        raise HTTPException(status_code=400, detail="Aucun champ à modifier")
+    res = await db.finance_entries.update_one({"id": entry_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Entrée introuvable")
+    return {"updated": True, **update}
+
+
 @api_router.delete("/finance/entries/month/{month}")
 async def reset_finance_month(month: str, _=Depends(require_auth)):
     """Supprime toutes les écritures finance d'un mois donné (YYYY-MM)."""

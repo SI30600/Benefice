@@ -3,7 +3,7 @@ import axios from "axios";
 import {
     Wallet, Plus, Trash2, Calendar, ArrowDownToLine, ArrowUpFromLine,
     AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
-    FileCheck2, ExternalLink, TrendingUp, RotateCcw, Package,
+    FileCheck2, ExternalLink, TrendingUp, RotateCcw, Package, Pencil, X,
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -92,6 +92,7 @@ export default function FinanceTab() {
         client_name: "",
     });
     const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "materiel" });
+    const [splitForm, setSplitForm] = useState({ enabled: false, prestaAmount: "" });
     const [lbcForm, setLbcForm] = useState({ label: "", amount: "", platform: "leboncoin", client_name: "" });
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
@@ -157,11 +158,34 @@ export default function FinanceTab() {
     useEffect(() => { refresh(); }, [refresh]);
 
     const addEntry = async () => {
-        if (!entryForm.amount || parseFloat(entryForm.amount) <= 0) return;
-        await axios.post(`${API}/finance/entries`, {
-            ...entryForm,
-            amount: parseFloat(entryForm.amount),
-        });
+        const total = parseFloat(entryForm.amount);
+        if (!entryForm.amount || total <= 0) return;
+        if (splitForm.enabled) {
+            const presta = parseFloat(splitForm.prestaAmount) || 0;
+            const mat = +(total - presta).toFixed(2);
+            if (presta <= 0 || mat <= 0) return;
+            // Crée 2 entrées : presta + matériel
+            await axios.post(`${API}/finance/entries`, {
+                date: entryForm.date,
+                category: "prestation",
+                amount: presta,
+                description: entryForm.description,
+                client_name: entryForm.client_name,
+            });
+            await axios.post(`${API}/finance/entries`, {
+                date: entryForm.date,
+                category: "materiel",
+                amount: mat,
+                description: entryForm.description,
+                client_name: entryForm.client_name,
+            });
+            setSplitForm({ enabled: false, prestaAmount: "" });
+        } else {
+            await axios.post(`${API}/finance/entries`, {
+                ...entryForm,
+                amount: total,
+            });
+        }
         setEntryForm({ ...entryForm, amount: "", description: "", client_name: "" });
         refresh();
     };
@@ -170,6 +194,24 @@ export default function FinanceTab() {
         await axios.delete(`${API}/finance/entries/${id}`);
         refresh();
     };
+
+    // Édition inline du montant d'une entrée (ex: enlever des frais bancaires)
+    const [editingEntry, setEditingEntry] = useState(null); // { id, amount }
+    const startEditEntry = (entry) => {
+        setEditingEntry({ id: entry.id, amount: String(entry.amount) });
+    };
+    const saveEditEntry = async () => {
+        if (!editingEntry) return;
+        const amt = parseFloat(editingEntry.amount);
+        if (isNaN(amt) || amt < 0) {
+            setEditingEntry(null);
+            return;
+        }
+        await axios.patch(`${API}/finance/entries/${editingEntry.id}`, { amount: amt });
+        setEditingEntry(null);
+        refresh();
+    };
+    const cancelEditEntry = () => setEditingEntry(null);
 
     const addPending = async () => {
         if (!pendingForm.client_name || !pendingForm.amount) return;
@@ -1202,6 +1244,45 @@ export default function FinanceTab() {
                             placeholder="Description / note (optionnel)"
                             className="w-full h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
                         />
+
+                        {/* Split Matériel / Prestation : toggle puis montant presta à extraire */}
+                        <div className="border border-[#333333] bg-[#0a0a0a] p-2.5">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    data-testid="entry-split-toggle"
+                                    type="checkbox"
+                                    checked={splitForm.enabled}
+                                    onChange={(e) => setSplitForm({ ...splitForm, enabled: e.target.checked })}
+                                    className="w-4 h-4 accent-yellow-500"
+                                />
+                                <span className="text-[10px] tracking-[0.15em] uppercase font-mono text-gray-300">
+                                    Splitter en matériel + prestation
+                                </span>
+                            </label>
+                            {splitForm.enabled && (
+                                <div className="mt-2 space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            data-testid="entry-split-presta"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={splitForm.prestaAmount}
+                                            onChange={(e) => setSplitForm({ ...splitForm, prestaAmount: e.target.value })}
+                                            placeholder="Montant prestation €"
+                                            className="h-10 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-blue-400 text-sm font-mono font-bold focus:outline-none"
+                                        />
+                                        <div className="h-10 px-2 bg-[#0d0d0d] border border-[#222222] flex items-center text-orange-400 text-sm font-mono font-bold">
+                                            Mat : {fmt(Math.max(0, (parseFloat(entryForm.amount) || 0) - (parseFloat(splitForm.prestaAmount) || 0)))} €
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] text-gray-500 font-mono leading-relaxed">
+                                        💡 Crée 2 lignes : <span className="text-orange-400">matériel</span> = total − presta · <span className="text-blue-400">prestation</span> = montant saisi.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
                         <button
                             data-testid="entry-add"
                             onClick={addEntry}
@@ -2096,38 +2177,93 @@ export default function FinanceTab() {
                     </p>
                 ) : (
                     <div className="space-y-1 max-h-96 overflow-y-auto">
-                        {entries.map((e) => (
-                            <div
-                                key={e.id}
-                                data-testid={`entry-item-${e.id}`}
-                                className="grid grid-cols-12 gap-2 items-center px-3 py-2 bg-[#0d0d0d] border border-[#222222] hover:border-[#444444]"
-                            >
-                                <span className="col-span-2 text-[11px] font-mono text-gray-400">{e.date}</span>
-                                <span className="col-span-2"><CategoryPill value={e.category} /></span>
-                                <div className="col-span-5 min-w-0">
-                                    <div className="text-sm text-white truncate">
-                                        {e.client_name || e.description || "—"}
-                                    </div>
-                                    {e.client_name && e.description && (
-                                        <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
-                                    )}
-                                    {e.source === "devis" && (
-                                        <span className="text-[9px] text-yellow-500 font-mono uppercase tracking-wider">[auto]</span>
-                                    )}
-                                </div>
-                                <span className="col-span-2 font-mono text-sm font-bold text-yellow-500 text-right">
-                                    {fmt(e.amount)} €
-                                </span>
-                                <button
-                                    data-testid={`entry-delete-${e.id}`}
-                                    onClick={() => deleteEntry(e.id)}
-                                    className="col-span-1 text-gray-500 hover:text-red-500 transition-colors flex justify-center"
-                                    aria-label="Supprimer"
+                        {entries.map((e) => {
+                            const isEditing = editingEntry?.id === e.id;
+                            return (
+                                <div
+                                    key={e.id}
+                                    data-testid={`entry-item-${e.id}`}
+                                    className="grid grid-cols-12 gap-2 items-center px-3 py-2 bg-[#0d0d0d] border border-[#222222] hover:border-[#444444]"
                                 >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                        ))}
+                                    <span className="col-span-2 text-[11px] font-mono text-gray-400">{e.date}</span>
+                                    <span className="col-span-2"><CategoryPill value={e.category} /></span>
+                                    <div className="col-span-4 min-w-0">
+                                        <div className="text-sm text-white truncate">
+                                            {e.client_name || e.description || "—"}
+                                        </div>
+                                        {e.client_name && e.description && (
+                                            <div className="text-[10px] text-gray-500 truncate">{e.description}</div>
+                                        )}
+                                        {e.source === "devis" && (
+                                            <span className="text-[9px] text-yellow-500 font-mono uppercase tracking-wider">[auto]</span>
+                                        )}
+                                    </div>
+                                    {isEditing ? (
+                                        <input
+                                            data-testid={`entry-edit-${e.id}`}
+                                            type="number"
+                                            step="0.01"
+                                            value={editingEntry.amount}
+                                            onChange={(ev) => setEditingEntry({ ...editingEntry, amount: ev.target.value })}
+                                            onKeyDown={(ev) => {
+                                                if (ev.key === "Enter") saveEditEntry();
+                                                if (ev.key === "Escape") cancelEditEntry();
+                                            }}
+                                            autoFocus
+                                            className="col-span-3 h-8 px-2 bg-[#1a1a1a] border border-yellow-500 text-yellow-500 text-sm font-mono font-bold text-right focus:outline-none"
+                                        />
+                                    ) : (
+                                        <span className="col-span-3 font-mono text-sm font-bold text-yellow-500 text-right">
+                                            {fmt(e.amount)} €
+                                        </span>
+                                    )}
+                                    <div className="col-span-1 flex items-center justify-end gap-1.5">
+                                        {isEditing ? (
+                                            <>
+                                                <button
+                                                    data-testid={`entry-save-${e.id}`}
+                                                    onClick={saveEditEntry}
+                                                    className="text-green-500 hover:text-green-400 transition-colors"
+                                                    aria-label="Enregistrer"
+                                                    title="Enregistrer (Entrée)"
+                                                >
+                                                    <Check className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                    data-testid={`entry-cancel-${e.id}`}
+                                                    onClick={cancelEditEntry}
+                                                    className="text-gray-500 hover:text-red-500 transition-colors"
+                                                    aria-label="Annuler"
+                                                    title="Annuler (Esc)"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    data-testid={`entry-edit-btn-${e.id}`}
+                                                    onClick={() => startEditEntry(e)}
+                                                    className="text-gray-500 hover:text-yellow-500 transition-colors"
+                                                    aria-label="Modifier le montant"
+                                                    title="Modifier le montant"
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </button>
+                                                <button
+                                                    data-testid={`entry-delete-${e.id}`}
+                                                    onClick={() => deleteEntry(e.id)}
+                                                    className="text-gray-500 hover:text-red-500 transition-colors"
+                                                    aria-label="Supprimer"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </SectionCard>
