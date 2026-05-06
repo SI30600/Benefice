@@ -1106,7 +1106,7 @@ export default function FinanceTab() {
                                     upcomingUrssaf.map((u, idx) => (
                                         <div key={u.cycle} className="flex justify-between items-center" data-testid={`urssaf-upcoming-${idx}`}>
                                             <span className="text-gray-400">
-                                                − URSSAF {monthLabel(u.cycle).split(" ")[0].toUpperCase()}
+                                                − {idx === 0 ? "Dernier URSSAF" : `URSSAF ${monthLabel(u.cycle).split(" ")[0].toUpperCase()}`}
                                                 {u.sourceMonth && (
                                                     <span className="text-gray-600 text-[10px] ml-1">
                                                         (CA {monthLabel(u.sourceMonth).split(" ")[0]})
