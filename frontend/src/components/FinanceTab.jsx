@@ -967,7 +967,7 @@ export default function FinanceTab() {
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
                                 Prochaine URSSAF
                                 <span className="text-gray-600 normal-case ml-1">
-                                    (4 {monthLabel(nextUrssaf.cycle).split(" ")[0] || ""} · CA {monthLabel(nextUrssaf.sourceMonth).split(" ")[0] || ""})
+                                    (CA {monthLabel(nextUrssaf.sourceMonth).split(" ")[0] || ""})
                                 </span>
                             </label>
                             <div
@@ -1103,7 +1103,7 @@ export default function FinanceTab() {
                                     upcomingUrssaf.map((u, idx) => (
                                         <div key={u.cycle} className="flex justify-between items-center" data-testid={`urssaf-upcoming-${idx}`}>
                                             <span className="text-gray-400">
-                                                − URSSAF 4 {monthLabel(u.cycle).split(" ")[0]}
+                                                − URSSAF {monthLabel(u.cycle).split(" ")[0].toUpperCase()}
                                                 {u.sourceMonth && (
                                                     <span className="text-gray-600 text-[10px] ml-1">
                                                         (CA {monthLabel(u.sourceMonth).split(" ")[0]})
