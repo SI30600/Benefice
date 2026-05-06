@@ -19,8 +19,8 @@ RATE_IMPOT_PRESTA = 0.017
 RATE_IMPOT_VENTE = 0.01
 RATE_FORMATION = 0.002
 
-CATEGORIES = ("prestation", "materiel", "formation", "achat")
-Category = Literal["prestation", "materiel", "formation", "achat"]
+CATEGORIES = ("prestation", "materiel", "formation", "achat", "autre")
+Category = Literal["prestation", "materiel", "formation", "achat", "autre"]
 
 
 class FinanceEntry(BaseModel):
@@ -181,22 +181,25 @@ def compute_summary(entries: list[dict]) -> dict:
     presta = round(sum(e["amount"] for e in entries if e["category"] == "prestation"), 2)
     materiel = round(sum(e["amount"] for e in entries if e["category"] == "materiel"), 2)
     formation = round(sum(e["amount"] for e in entries if e["category"] == "formation"), 2)
+    autre = round(sum(e["amount"] for e in entries if e["category"] == "autre"), 2)
     achats = round(sum(e["amount"] for e in entries if e["category"] == "achat"), 2)
-    total_ca = round(presta + materiel + formation, 2)
+    total_ca = round(presta + materiel + formation + autre, 2)
 
     urssaf_presta = round(presta * RATE_URSSAF_PRESTA, 2)
     urssaf_materiel = round(materiel * RATE_URSSAF_VENTE, 2)
-    # Pour la formation BNC, on considère le même taux URSSAF que les prestations
+    # Pour la formation BNC et "autre", on considère le même taux URSSAF que les prestations
     urssaf_formation = round(formation * RATE_URSSAF_PRESTA, 2)
+    urssaf_autre = round(autre * RATE_URSSAF_PRESTA, 2)
 
     impot_presta = round(presta * RATE_IMPOT_PRESTA, 2)
     impot_vente = round(materiel * RATE_IMPOT_VENTE, 2)
     impot_formation = round(formation * RATE_IMPOT_PRESTA, 2)
+    impot_autre = round(autre * RATE_IMPOT_PRESTA, 2)
 
     cfp = round(total_ca * RATE_FORMATION, 2)
 
-    total_urssaf = round(urssaf_presta + urssaf_materiel + urssaf_formation, 2)
-    total_impot = round(impot_presta + impot_vente + impot_formation, 2)
+    total_urssaf = round(urssaf_presta + urssaf_materiel + urssaf_formation + urssaf_autre, 2)
+    total_impot = round(impot_presta + impot_vente + impot_formation + impot_autre, 2)
     total_taxes = round(total_urssaf + total_impot + cfp, 2)
     net_after_taxes = round(total_ca - total_taxes, 2)
     # Vrai cash "dans la poche" : CA - taxes - coût des achats (matériel revendu)
@@ -212,13 +215,16 @@ def compute_summary(entries: list[dict]) -> dict:
         "presta": presta,
         "materiel": materiel,
         "formation": formation,
+        "autre": autre,
         "achats": achats,
         "urssaf_presta": urssaf_presta,
         "urssaf_materiel": urssaf_materiel,
         "urssaf_formation": urssaf_formation,
+        "urssaf_autre": urssaf_autre,
         "impot_presta": impot_presta,
         "impot_vente": impot_vente,
         "impot_formation": impot_formation,
+        "impot_autre": impot_autre,
         "cfp": cfp,
         "total_urssaf": total_urssaf,
         "total_impot": total_impot,

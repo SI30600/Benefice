@@ -164,7 +164,6 @@ export default function FinanceTab() {
             const presta = parseFloat(splitForm.prestaAmount) || 0;
             const mat = +(total - presta).toFixed(2);
             if (presta <= 0 || mat <= 0) return;
-            // Crée 2 entrées : presta + matériel
             await axios.post(`${API}/finance/entries`, {
                 date: entryForm.date,
                 category: "prestation",
@@ -181,9 +180,16 @@ export default function FinanceTab() {
             });
             setSplitForm({ enabled: false, prestaAmount: "" });
         } else {
+            // Catégorie "autre" : on remappe vers presta ou matériel selon le taux choisi
+            const realCategory = entryForm.category === "autre"
+                ? (entryForm.autreRate || "prestation")
+                : entryForm.category;
             await axios.post(`${API}/finance/entries`, {
-                ...entryForm,
+                date: entryForm.date,
+                category: realCategory,
                 amount: total,
+                description: entryForm.description,
+                client_name: entryForm.client_name,
             });
         }
         setEntryForm({ ...entryForm, amount: "", description: "", client_name: "" });
@@ -664,6 +670,7 @@ export default function FinanceTab() {
             materiel: { label: "Matériel", color: "border-orange-500/50 text-orange-400" },
             formation: { label: "Formation", color: "border-purple-500/50 text-purple-400" },
             achat: { label: "Dépense", color: "border-red-500/50 text-red-400" },
+            autre: { label: "Autre", color: "border-gray-500/50 text-gray-400" },
         };
         const conf = map[value] || { label: value, color: "border-gray-500 text-gray-400" };
         return (
@@ -1214,7 +1221,20 @@ export default function FinanceTab() {
                             >
                                 <option value="prestation">Prestation</option>
                                 <option value="materiel">Matériel</option>
+                                <option value="autre">Autre (libre)</option>
                             </select>
+                            {entryForm.category === "autre" && (
+                                <select
+                                    data-testid="entry-autre-rate"
+                                    value={entryForm.autreRate || "prestation"}
+                                    onChange={(e) => setEntryForm({ ...entryForm, autreRate: e.target.value })}
+                                    className="h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
+                                    title="Taux URSSAF à appliquer pour cette saisie libre"
+                                >
+                                    <option value="prestation">Taux Prestation (23,1%)</option>
+                                    <option value="materiel">Taux Matériel (13,5%)</option>
+                                </select>
+                            )}
                         </div>
 
                         <input
