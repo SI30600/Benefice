@@ -437,11 +437,15 @@ async def import_subscriptions(month: Optional[str] = None, _=Depends(require_au
     if len(month) != 7 or month[4] != "-":
         raise HTTPException(status_code=400, detail="Format mois invalide (YYYY-MM)")
 
+    # Liste des abonnements à exclure de l'import mensuel (prépayés annuels, hors récurrent)
+    EXCLUDED_LABELS = {"molto"}
+
     revenues = await db.recurring_revenues.find({}, {"_id": 0}).to_list(500)
     imported, skipped = [], []
     for r in revenues:
-        # Les abos prépayés (déjà encaissés à l'année) ne sont pas réimportés chaque mois
-        if r.get("prepaid"):
+        label_norm = (r.get("label") or "").strip().lower()
+        # Skip si label contient un terme exclu OU si abo marqué prépayé annuel
+        if r.get("prepaid") or any(excl in label_norm for excl in EXCLUDED_LABELS):
             skipped.append(r.get("id"))
             continue
         sub_id = r.get("id")
