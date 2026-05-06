@@ -454,8 +454,8 @@ export default function FinanceTab() {
         for (let offset = 0; offset <= 2; offset++) {
             const payDate = new Date(today.getFullYear(), today.getMonth() + offset, 4);
             const diff = Math.floor((payDate - today) / (1000 * 60 * 60 * 24));
-            if (diff > PREV_HORIZON) continue;
-            if (offset > 0 && diff < 0) continue;
+            // N'affiche que les prélèvements à venir : passé le 4, le cycle du mois courant disparaît
+            if (diff < 0 || diff > PREV_HORIZON) continue;
 
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
