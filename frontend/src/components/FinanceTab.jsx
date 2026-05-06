@@ -22,11 +22,11 @@ const monthLabel = (yyyymm) => {
     return dt.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 };
 
-// Retourne YYYY-MM du mois M+2 (mois de prélèvement URSSAF pour un CA donné)
-const nextNextMonth = (yyyymm) => {
+// Retourne YYYY-MM du mois M+1 (mois de prélèvement URSSAF pour un CA donné, décalage 1 mois)
+const nextMonth = (yyyymm) => {
     if (!yyyymm) return "";
     const [y, m] = yyyymm.split("-");
-    const dt = new Date(Number(y), Number(m) - 1 + 2, 1);
+    const dt = new Date(Number(y), Number(m) - 1 + 1, 1);
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
 };
 
@@ -407,16 +407,16 @@ export default function FinanceTab() {
         [revenues.items, todayDay]
     );
 
-    // URSSAF auto-deduction prompt: on/after the 4th of month M, withdraw URSSAF of CA from M-2
+    // URSSAF auto-deduction prompt: on/after the 4th of month M, withdraw URSSAF of CA from M-1
     const urssafPrompt = useMemo(() => {
         const today = new Date();
         const cycle = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
         const handled = (balance.urssaf_handled_cycles || []).find((h) => h.cycle === cycle);
         const past4th = today.getDate() >= 4;
-        // Amount from M-2 summary (only available when viewing current month's summary)
+        // Amount from M-1 summary (only available when viewing current month's summary)
         const viewingCurrent = month === cycle;
         const autoAmount = viewingCurrent
-            ? (summary?.prev_prev?.total_taxes || 0)
+            ? (summary?.previous?.total_taxes || 0)
             : 0;
         // Try to recover a raw override value set last month (bypass expiry check)
         let rawOverride = 0;
@@ -428,7 +428,7 @@ export default function FinanceTab() {
             }
         } catch { /* noop */ }
         const suggestedAmount = rawOverride > 0 ? rawOverride : autoAmount;
-        const sourceMonth = summary?.prev_prev_month || "";
+        const sourceMonth = summary?.previous_month || "";
         return {
             cycle, past4th, handled, suggestedAmount, sourceMonth,
             show: past4th && !handled && viewingCurrent && suggestedAmount > 0,
@@ -443,7 +443,7 @@ export default function FinanceTab() {
         }
     }, [urssafPrompt.show, urssafPrompt.suggestedAmount, urssafPromptAmount]);
 
-    // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-2
+    // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-1 (décalage 1 mois)
     // Retourne la liste des prélèvements à venir dans la fenêtre PREV_HORIZON jours (max 3)
     const upcomingUrssaf = useMemo(() => {
         const today = new Date();
@@ -460,14 +460,13 @@ export default function FinanceTab() {
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
 
-            // Source = M-2 relative to the payment month
-            const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 2, 1);
+            // Source = M-1 relative to the payment month
+            const srcDate = new Date(payDate.getFullYear(), payDate.getMonth() - 1, 1);
             const sourceMonth = `${srcDate.getFullYear()}-${String(srcDate.getMonth() + 1).padStart(2, "0")}`;
 
             // Map source month to the right summary bucket
             let autoAmount = 0;
-            if (sourceMonth === summary?.prev_prev_month) autoAmount = summary?.prev_prev?.total_taxes || 0;
-            else if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
+            if (sourceMonth === summary?.previous_month) autoAmount = summary?.previous?.total_taxes || 0;
             else if (sourceMonth === summary?.month) autoAmount = summary?.current?.total_taxes || 0;
 
             // Override s'applique uniquement au premier cycle non traité (le plus imminent)
@@ -484,32 +483,18 @@ export default function FinanceTab() {
     // Le "prochain" prélèvement = le premier de la liste (ou un fallback vide)
     const nextUrssaf = useMemo(() => {
         if (upcomingUrssaf.length > 0) {
-            return { ...upcomingUrssaf[0], useCurrentMonthPayment: upcomingUrssaf[0].cycle.endsWith(String(new Date().getMonth() + 1).padStart(2, "0")) };
+            return { ...upcomingUrssaf[0] };
         }
-        // No payment in horizon — still compute the "would-be" next cycle for UI labels
+        // No payment in horizon — fallback pour labels UI
         const today = new Date();
         const cycle = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-        return { cycle, sourceMonth: summary?.prev_prev_month || "", amount: 0, useCurrentMonthPayment: true };
+        return { cycle, sourceMonth: summary?.previous_month || "", amount: 0 };
     }, [upcomingUrssaf, summary]);
-
-    // URSSAF en cours du mois courant (non encore prélevée — sera prélevée le 4 de M+2)
-    // Se déduit aussi du "Disponible prév." pour ne pas se tromper sur l'argent réellement disponible
-    const currentMonthUrssaf = useMemo(() => {
-        return +(cur?.total_taxes || 0).toFixed(2);
-    }, [cur]);
 
     const totalUpcomingUrssaf = useMemo(
         () => upcomingUrssaf.reduce((s, u) => s + u.amount, 0),
         [upcomingUrssaf]
     );
-
-    // Ne compte pas 2 fois si l'URSSAF de M (cur) est déjà dans la liste upcomingUrssaf (fenêtre 35j)
-    const currentMonthUrssafInWindow = useMemo(() => {
-        if (!summary?.month) return false;
-        return upcomingUrssaf.some((u) => u.sourceMonth === summary.month);
-    }, [upcomingUrssaf, summary]);
-
-    const extraCurrentMonthUrssaf = currentMonthUrssafInWindow ? 0 : currentMonthUrssaf;
 
     const projected = useMemo(() => {
         if (!cur) return 0;
@@ -520,12 +505,11 @@ export default function FinanceTab() {
             + pending.total
             + revenuesUpcomingTotal
             - totalUpcomingUrssaf
-            - extraCurrentMonthUrssaf
             - cb
             - lbcList.total
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf]);
+    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -579,16 +563,16 @@ export default function FinanceTab() {
             }
         });
 
-        // URSSAF : prélèvement le 4 de chaque mois avec décalage de 2 mois (CA M → paiement 4 de M+2)
+        // URSSAF : prélèvement le 4 de chaque mois avec décalage de 1 mois (CA M → paiement 4 de M+1)
         // Pas d'estimatif : seuls les vrais CA saisis sont utilisés. L'override s'applique UNIQUEMENT
         // au prochain prélèvement immédiat (quand le CA source n'est pas encore déclaré).
         const handled = balance.urssaf_handled_cycles || [];
         const overrideVal = parseFloat(urssafNextOverride) || 0;
 
-        // 4 du mois courant = URSSAF de M-2 (prev_prev) — si pas encore traitée, peut utiliser l'override
+        // 4 du mois courant = URSSAF de M-1 (previous) — si pas encore traitée, peut utiliser l'override
         const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         if (!handled.find((h) => h.cycle === curCycle)) {
-            const amt = overrideVal > 0 ? overrideVal : (summary?.prev_prev?.total_taxes || 0);
+            const amt = overrideVal > 0 ? overrideVal : (summary?.previous?.total_taxes || 0);
             if (amt > 0) {
                 const m0 = new Date(now.getFullYear(), now.getMonth(), 4);
                 const diff0 = Math.floor((m0 - now) / (1000 * 60 * 60 * 24));
@@ -598,21 +582,12 @@ export default function FinanceTab() {
                 }
             }
         }
-        // 4 de M+1 = URSSAF de M-1 (previous) — chiffre réel uniquement
-        if ((summary?.previous?.total_taxes || 0) > 0) {
+        // 4 de M+1 = URSSAF du mois courant (cur) — chiffre réel uniquement
+        if ((cur?.total_taxes || 0) > 0) {
             const m1 = new Date(now.getFullYear(), now.getMonth() + 1, 4);
             const diff1 = Math.floor((m1 - now) / (1000 * 60 * 60 * 24));
             if (diff1 >= 0 && diff1 <= HORIZON_DAYS) {
                 const key = m1.toISOString().slice(0, 10);
-                if (key in eventsByDate) eventsByDate[key] -= summary.previous.total_taxes;
-            }
-        }
-        // 4 de M+2 = URSSAF du mois courant (cur) — chiffre réel uniquement
-        if ((cur?.total_taxes || 0) > 0) {
-            const m2 = new Date(now.getFullYear(), now.getMonth() + 2, 4);
-            const diff2 = Math.floor((m2 - now) / (1000 * 60 * 60 * 24));
-            if (diff2 >= 0 && diff2 <= HORIZON_DAYS) {
-                const key = m2.toISOString().slice(0, 10);
                 if (key in eventsByDate) eventsByDate[key] -= cur.total_taxes;
             }
         }
@@ -846,7 +821,7 @@ export default function FinanceTab() {
                                     </div>
                                 </div>
                                 <div className="text-[9px] text-gray-500 font-mono mt-2">
-                                    Prélèvement prévu le 4 {monthLabel(nextNextMonth(month))}
+                                    Prélèvement prévu le 4 {monthLabel(nextMonth(month))}
                                 </div>
                             </div>
 
@@ -1078,7 +1053,7 @@ export default function FinanceTab() {
                             <div className="text-[9px] text-gray-500 font-mono mb-3">
                                 {urssafNextOverride
                                     ? `Valeur manuelle (${monthLabel(month).split(" ")[0]}) · auto : ${fmt(nextUrssaf.amount)} €`
-                                    : `Auto-calcul depuis CA ${nextUrssaf.sourceMonth ? monthLabel(nextUrssaf.sourceMonth) : "M-2"} (${fmt(nextUrssaf.amount)} €)`}
+                                    : `Auto-calcul depuis CA ${nextUrssaf.sourceMonth ? monthLabel(nextUrssaf.sourceMonth) : "M-1"} (${fmt(nextUrssaf.amount)} €)`}
                             </div>
 
                             <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
@@ -1227,17 +1202,6 @@ export default function FinanceTab() {
                                             </span>
                                         </div>
                                     ))
-                                )}
-                                {extraCurrentMonthUrssaf > 0 && (
-                                    <div className="flex justify-between" data-testid="urssaf-current-accruing">
-                                        <span className="text-gray-400">
-                                            − URSSAF en cours
-                                            <span className="text-gray-600 text-[10px] ml-1">
-                                                (CA {monthLabel(summary?.month || "").split(" ")[0]})
-                                            </span>
-                                        </span>
-                                        <span className="text-red-400">−{fmt(extraCurrentMonthUrssaf)} €</span>
-                                    </div>
                                 )}
                                 <div className="flex justify-between pt-2 border-t border-[#333333]">
                                     <span className="text-yellow-300 uppercase tracking-wider text-[10px]">Disponible prév.</span>
