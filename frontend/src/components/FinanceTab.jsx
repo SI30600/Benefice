@@ -468,7 +468,9 @@ export default function FinanceTab() {
             else if (sourceMonth === summary?.month) autoAmount = summary?.current?.total_taxes || 0;
 
             const isFirstShown = items.length === 0;
-            const amount = isFirstShown && overrideVal > 0 ? overrideVal : autoAmount;
+            // L'override manuel ne s'applique QUE si l'auto-calcul est 0 (CA non encore déclaré)
+            // Dès qu'un CA réel existe, c'est lui qui prime — l'override est ignoré silencieusement
+            const amount = (isFirstShown && autoAmount === 0 && overrideVal > 0) ? overrideVal : autoAmount;
 
             if (amount > 0) {
                 items.push({ cycle, sourceMonth, amount, autoAmount, payDate: payDate.toISOString().slice(0, 10) });
@@ -581,7 +583,9 @@ export default function FinanceTab() {
         // 4 du mois courant = URSSAF de M-1 (previous) — si pas encore traitée, peut utiliser l'override
         const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         if (!handled.find((h) => h.cycle === curCycle)) {
-            const amt = overrideVal > 0 ? overrideVal : (summary?.previous?.total_taxes || 0);
+            const auto = summary?.previous?.total_taxes || 0;
+            // Override seulement si auto = 0 (CA M-1 non déclaré)
+            const amt = auto > 0 ? auto : (overrideVal > 0 ? overrideVal : 0);
             if (amt > 0) {
                 const m0 = new Date(now.getFullYear(), now.getMonth(), 4);
                 const diff0 = Math.floor((m0 - now) / (1000 * 60 * 60 * 24));
