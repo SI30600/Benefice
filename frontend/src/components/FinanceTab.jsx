@@ -566,18 +566,18 @@ export default function FinanceTab() {
         const overrideVal = parseFloat(urssafNextOverride) || 0;
 
         // 4 du mois courant = URSSAF de M-1 (previous) — si pas encore traitée, peut utiliser l'override
+        // Si la date est passée (cycle non traité), on place le prélèvement à aujourd'hui pour qu'il reste visible
         const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         if (!handled.find((h) => h.cycle === curCycle)) {
             const auto = summary?.previous?.total_taxes || 0;
-            // Override seulement si auto = 0 (CA M-1 non déclaré)
             const amt = auto > 0 ? auto : (overrideVal > 0 ? overrideVal : 0);
             if (amt > 0) {
                 const m0 = new Date(now.getFullYear(), now.getMonth(), 4);
                 const diff0 = Math.floor((m0 - now) / (1000 * 60 * 60 * 24));
-                if (diff0 >= 0 && diff0 <= HORIZON_DAYS) {
-                    const key = m0.toISOString().slice(0, 10);
-                    if (key in eventsByDate) eventsByDate[key] -= amt;
-                }
+                // Si dans le futur (avant le 4) → date du 4. Sinon (passé le 4 mais non traité) → aujourd'hui
+                const targetDate = diff0 >= 0 ? m0 : now;
+                const key = targetDate.toISOString().slice(0, 10);
+                if (key in eventsByDate) eventsByDate[key] -= amt;
             }
         }
         // 4 de M+1 = URSSAF du mois courant (cur) — chiffre réel uniquement
