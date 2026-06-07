@@ -30,6 +30,22 @@ const nextMonth = (yyyymm) => {
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
 };
 
+const CategoryPill = ({ value }) => {
+    const map = {
+        prestation: { label: "Prestation", color: "border-blue-500/50 text-blue-400" },
+        materiel: { label: "Matériel", color: "border-orange-500/50 text-orange-400" },
+        formation: { label: "Formation", color: "border-purple-500/50 text-purple-400" },
+        achat: { label: "Dépense", color: "border-red-500/50 text-red-400" },
+        autre: { label: "Autre", color: "border-gray-500/50 text-gray-400" },
+    };
+    const conf = map[value] || { label: value, color: "border-gray-500 text-gray-400" };
+    return (
+        <span className={`text-[9px] font-mono tracking-[0.15em] uppercase px-1.5 py-0.5 border ${conf.color}`}>
+            {conf.label}
+        </span>
+    );
+};
+
 const SectionCard = ({ children, className = "", id }) => (
     <div id={id} className={`bg-[#111111] border border-[#262626] p-5 md:p-6 ${className}`}>
         {children}
@@ -169,6 +185,22 @@ export default function FinanceTab() {
     }, [month]);
 
     useEffect(() => { refresh(); }, [refresh]);
+
+    // Auto-import des abonnements dans les saisies du mois (idempotent côté backend)
+    // Lancé à chaque changement de mois — n'écrase pas les saisies modifiées manuellement
+    useEffect(() => {
+        if (!month) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await axios.post(`${API}/finance/import-subscriptions?month=${month}`);
+                if (!cancelled && (res.data?.imported || 0) > 0) {
+                    refresh();
+                }
+            } catch { /* silent : import non bloquant */ }
+        })();
+        return () => { cancelled = true; };
+    }, [month, refresh]);
 
     const addEntry = async () => {
         const total = parseFloat(entryForm.amount);
@@ -680,22 +712,6 @@ export default function FinanceTab() {
         [projectionData]
     );
 
-    const CategoryPill = ({ value }) => {
-        const map = {
-            prestation: { label: "Prestation", color: "border-blue-500/50 text-blue-400" },
-            materiel: { label: "Matériel", color: "border-orange-500/50 text-orange-400" },
-            formation: { label: "Formation", color: "border-purple-500/50 text-purple-400" },
-            achat: { label: "Dépense", color: "border-red-500/50 text-red-400" },
-            autre: { label: "Autre", color: "border-gray-500/50 text-gray-400" },
-        };
-        const conf = map[value] || { label: value, color: "border-gray-500 text-gray-400" };
-        return (
-            <span className={`text-[9px] font-mono tracking-[0.15em] uppercase px-1.5 py-0.5 border ${conf.color}`}>
-                {conf.label}
-            </span>
-        );
-    };
-
     return (
         <div data-testid="finance-tab" className="space-y-6">
             {/* Header */}
@@ -1097,7 +1113,7 @@ export default function FinanceTab() {
                                 </button>
                             </div>
                             <p className="text-[10px] text-gray-500 font-mono mb-2 leading-snug">
-                                💡 Si le nom client correspond à un paiement en attente, l'achat sera automatiquement déduit de "dans ta poche" lors de l'encaissement.
+                                💡 Si le nom client correspond à un paiement en attente, l&apos;achat sera automatiquement déduit de &laquo;&nbsp;dans ta poche&nbsp;&raquo; lors de l&apos;encaissement.
                             </p>
 
                             {lbcList.items.length > 0 && (
@@ -1691,7 +1707,7 @@ export default function FinanceTab() {
                                 onChange={(e) => setRevenueForm({ ...revenueForm, prepaid: e.target.checked })}
                                 className="h-3.5 w-3.5 accent-blue-500"
                             />
-                            Prépayé (annuel · n'affecte pas le prévisionnel)
+                            Prépayé (annuel · n&apos;affecte pas le prévisionnel)
                         </label>
                         <button
                             data-testid="revenue-add"
@@ -1829,7 +1845,7 @@ export default function FinanceTab() {
                         Stock réel · {stock.fixes + stock.portables} pc · {fmt(stock.total_value)} €
                     </SectionTitle>
                     <p className="text-[10px] text-gray-500 font-mono mb-3">
-                        Pour info — n'affecte ni le CA ni le prévisionnel
+                        Pour info — n&apos;affecte ni le CA ni le prévisionnel
                     </p>
                     <div className="grid grid-cols-12 gap-2 mb-3">
                         <input
@@ -1871,10 +1887,10 @@ export default function FinanceTab() {
                                         className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
                                     >
                                         <option value="">Écran…</option>
-                                        <option value='14"'>14"</option>
-                                        <option value='15,6"'>15,6"</option>
-                                        <option value='16"'>16"</option>
-                                        <option value='17"'>17"</option>
+                                        <option value='14"'>14&quot;</option>
+                                        <option value='15,6"'>15,6&quot;</option>
+                                        <option value='16"'>16&quot;</option>
+                                        <option value='17"'>17&quot;</option>
                                     </select>
                                     <select
                                         value={stockForm.specs.resolution}
