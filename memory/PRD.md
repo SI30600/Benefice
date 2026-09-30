@@ -87,6 +87,8 @@ Application de calcul de bénéfice net pour revente de pièces informatiques + 
 - **2026-05-03** : Boutons Reset par mois (en cours + mois précédent) — endpoint `DELETE /api/finance/entries/month/{YYYY-MM}` avec confirmation UI
 - **2026-05-03** : URSSAF auto-déduction du Solde réel — le 4 du mois M, bannière de confirmation calcule le prélèvement depuis CA de M-2 (2 mois de décalage), 3 actions : `Déduire du solde` / `Déjà fait` / `Pas encore`. Undo disponible. Backend : `urssaf_handled_cycles[]` + `POST /finance/balance/urssaf-handle` + `POST /finance/balance/urssaf-undo` + summary `prev_prev_month`
 - **2026-05-03** : Correction décalage URSSAF à 2 mois PARTOUT (ligne "Prochaine URSSAF", projection 30j, graphique 90j). Label dynamique "(4 mai · CA mars)" pour clarté. Le 90-day forecast place 3 prélèvements URSSAF : 4 du mois courant (si pas traité) = M-2 CA, 4 de M+1 = M-1 CA, 4 de M+2 = M CA
+- **2026-09-30** : UI simplification — suppression des blocs "Stock réel", "Paiements à préparer", et "Achats en attente" (LBC) du dashboard Finance. Nettoyage complet du state, des handlers, et des dépendances de projection.
+- **2026-09-30** : Nouveau champ **"Coût matériel"** dans le formulaire de saisie d'entrée — quand renseigné, crée automatiquement une entrée `achat` en parallèle de la vente. Aperçu temps réel de l'estim. "dans ta poche" (net = CA − taxes − coût) affiché avant validation. "DANS TA POCHE" reflète maintenant le bénéfice réel sans passer par le workflow LBC.
 
 ### 🚧 Configuration Azure requise
 - App registration en single-tenant

@@ -94,11 +94,8 @@ export default function FinanceTab() {
     const [summary, setSummary] = useState(null);
     const [entries, setEntries] = useState([]);
     const [pending, setPending] = useState({ items: [], total: 0 });
-    const [lbcList, setLbcList] = useState({ items: [], total: 0 });
     const [charges, setCharges] = useState({ items: [], total: 0 });
     const [revenues, setRevenues] = useState({ items: [], total: 0 });
-    const [toPrepare, setToPrepare] = useState({ items: [], total: 0 });
-    const [stock, setStock] = useState({ items: [], total_value: 0, fixes: 0, portables: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
     // Override URSSAF désactivé : on utilise toujours l'auto-calcul depuis le CA réel
     // Variables maintenues pour compatibilité avec le reste du code (always 0)
@@ -119,64 +116,37 @@ export default function FinanceTab() {
         amount: "",
         description: "",
         client_name: "",
+        cost: "",  // Coût matériel pour cette vente — sera enregistré comme entrée "achat"
     });
     const [pendingForm, setPendingForm] = useState({ client_name: "", amount: "", note: "", category: "materiel" });
     const [splitForm, setSplitForm] = useState({ enabled: false, prestaAmount: "" });
-    const [lbcForm, setLbcForm] = useState({ label: "", amount: "", platform: "leboncoin", client_name: "" });
     const [chargeForm, setChargeForm] = useState({ label: "", amount: "", day_of_month: "" });
     const [revenueForm, setRevenueForm] = useState({ label: "", amount: "", day_of_month: "", prepaid: false });
-    const [prepareForm, setPrepareForm] = useState({ label: "", amount: "", note: "" });
-    const emptySpecs = {
-        screen: "",
-        resolution: "",
-        cpu_brand: "",
-        cpu_model: "",
-        ram: "",
-        storage: "",
-        gpu: "",
-        wifi: "",
-        bluetooth: false,
-        webcam: "",
-        keyboard_backlit: false,
-        warranty: "",
-    };
-    const [stockForm, setStockForm] = useState({
-        label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "",
-        specs: { ...emptySpecs },
-    });
     const [wifeForm, setWifeForm] = useState({ amount: "", note: "" });
     const [balanceInput, setBalanceInput] = useState("");
     const [cbDeferredInput, setCbDeferredInput] = useState("");
-    const [lbcPendingInput, setLbcPendingInput] = useState("");
 
     const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumR, entR, penR, balR, lbcR, chargesR, revR, prepR, stockR, wifeR] = await Promise.all([
+            const [sumR, entR, penR, balR, chargesR, revR, wifeR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
                 axios.get(`${API}/finance/balance`),
-                axios.get(`${API}/finance/lbc-purchases`),
                 axios.get(`${API}/finance/monthly-charges`),
                 axios.get(`${API}/finance/recurring-revenues`),
-                axios.get(`${API}/finance/payments-to-prepare`),
-                axios.get(`${API}/finance/stock`),
                 axios.get(`${API}/finance/wife-payments?month=${month}`),
             ]);
             setSummary(sumR.data);
             setEntries(entR.data);
             setPending(penR.data);
             setBalance(balR.data);
-            setLbcList(lbcR.data);
             setCharges(chargesR.data);
             setRevenues(revR.data);
-            setToPrepare(prepR.data);
-            setStock(stockR.data);
             setWife(wifeR.data);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
-            setLbcPendingInput(String(balR.data.lbc_pending ?? 0));
         } catch (e) {
             console.error(e);
         } finally {
@@ -205,6 +175,7 @@ export default function FinanceTab() {
     const addEntry = async () => {
         const total = parseFloat(entryForm.amount);
         if (!entryForm.amount || total <= 0) return;
+        const cost = parseFloat(entryForm.cost) || 0;
         // Si client GoCardless → déduit la commission Advanced (1.25% + 0.20€, plafonné 2.50€)
         const gcFee = isGoCardlessClient(entryForm.client_name) ? gocardlessFee(total) : 0;
         const netTotal = +(total - gcFee).toFixed(2);
@@ -240,7 +211,17 @@ export default function FinanceTab() {
                 client_name: entryForm.client_name,
             });
         }
-        setEntryForm({ ...entryForm, amount: "", description: "", client_name: "" });
+        // Coût matériel → entrée "achat" (déduite de "dans ta poche", pas du CA)
+        if (cost > 0) {
+            await axios.post(`${API}/finance/entries`, {
+                date: entryForm.date,
+                category: "achat",
+                amount: cost,
+                description: `Coût matériel${entryForm.description ? " — " + entryForm.description : ""}`,
+                client_name: entryForm.client_name,
+            });
+        }
+        setEntryForm({ ...entryForm, amount: "", description: "", client_name: "", cost: "" });
         refresh();
     };
 
@@ -291,24 +272,6 @@ export default function FinanceTab() {
 
     const updatePendingCategory = async (id, category) => {
         await axios.patch(`${API}/finance/pending/${id}`, { category });
-        refresh();
-    };
-
-    const addLbcPurchase = async () => {
-        if (!lbcForm.amount || parseFloat(lbcForm.amount) <= 0) return;
-        const platform = lbcForm.platform || "leboncoin";
-        await axios.post(`${API}/finance/lbc-purchases`, {
-            label: lbcForm.label || `Achat ${platform}`,
-            amount: parseFloat(lbcForm.amount),
-            platform,
-            client_name: lbcForm.client_name || "",
-        });
-        setLbcForm({ label: "", amount: "", platform: "leboncoin", client_name: "" });
-        refresh();
-    };
-
-    const deleteLbcPurchase = async (id) => {
-        await axios.delete(`${API}/finance/lbc-purchases/${id}`);
         refresh();
     };
 
@@ -377,41 +340,6 @@ export default function FinanceTab() {
         refresh();
     };
 
-    const addPrepare = async () => {
-        if (!prepareForm.label) return;
-        await axios.post(`${API}/finance/payments-to-prepare`, {
-            label: prepareForm.label,
-            amount: parseFloat(prepareForm.amount) || 0,
-            note: prepareForm.note || "",
-        });
-        setPrepareForm({ label: "", amount: "", note: "" });
-        refresh();
-    };
-
-    const deletePrepare = async (id) => {
-        await axios.delete(`${API}/finance/payments-to-prepare/${id}`);
-        refresh();
-    };
-
-    const addStock = async () => {
-        if (!stockForm.label) return;
-        await axios.post(`${API}/finance/stock`, {
-            label: stockForm.label,
-            kind: stockForm.kind,
-            quantity: parseInt(stockForm.quantity, 10) || 1,
-            unit_value: parseFloat(stockForm.unit_value) || 0,
-            serial: stockForm.serial || "",
-            specs: stockForm.specs || {},
-        });
-        setStockForm({ label: "", kind: "fixe", quantity: "1", unit_value: "", serial: "", specs: { ...emptySpecs } });
-        refresh();
-    };
-
-    const deleteStock = async (id) => {
-        await axios.delete(`${API}/finance/stock/${id}`);
-        refresh();
-    };
-
     const addWifePayment = async () => {
         const amt = parseFloat(wifeForm.amount);
         if (!amt || amt <= 0) return;
@@ -433,7 +361,7 @@ export default function FinanceTab() {
         await axios.put(`${API}/finance/balance`, {
             balance: parseFloat(balanceInput) || 0,
             cb_deferred: parseFloat(cbDeferredInput) || 0,
-            lbc_pending: parseFloat(lbcPendingInput) || 0,
+            lbc_pending: 0,
         });
         refresh();
     };
@@ -596,10 +524,9 @@ export default function FinanceTab() {
             - totalUpcomingUrssaf
             - extraCurrentMonthUrssaf
             - cb
-            - lbcList.total
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, lbcList.total, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf]);
+    }, [balanceInput, cbDeferredInput, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -612,7 +539,7 @@ export default function FinanceTab() {
         const real = parseFloat(balanceInput) || 0;
         const cb = parseFloat(cbDeferredInput) || 0;
         // Point de départ = cash réellement sur le compte (hors pending, qui arrivera à J+12)
-        const startToday = real - cb - lbcList.total;
+        const startToday = real - cb;
 
         // Pré-construit les événements pour les N prochains jours
         const eventsByDate = {};
@@ -705,7 +632,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, lbcList.total, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles]);
+    }, [balanceInput, cbDeferredInput, pending.total, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
@@ -1062,103 +989,6 @@ export default function FinanceTab() {
                                 {fmt(nextUrssaf.autoAmount || nextUrssaf.amount || 0)} €
                             </div>
 
-                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-400 block">
-                                Achats en attente · {fmt(lbcList.total)} €
-                            </label>
-                            <div className="grid grid-cols-12 gap-2 mt-1.5">
-                                <select
-                                    data-testid="lbc-purchase-platform"
-                                    value={lbcForm.platform}
-                                    onChange={(e) => setLbcForm({ ...lbcForm, platform: e.target.value })}
-                                    className="col-span-5 h-10 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-xs font-mono focus:outline-none"
-                                >
-                                    <option value="leboncoin">Leboncoin</option>
-                                    <option value="vinted">Vinted</option>
-                                    <option value="ebay">eBay</option>
-                                    <option value="rakuten">Rakuten</option>
-                                    <option value="amazon">Amazon</option>
-                                    <option value="facebook">Facebook MP</option>
-                                    <option value="particulier">Particulier</option>
-                                    <option value="magasin">Magasin</option>
-                                    <option value="autre">Autre</option>
-                                </select>
-                                <input
-                                    data-testid="lbc-purchase-client"
-                                    type="text"
-                                    value={lbcForm.client_name}
-                                    onChange={(e) => setLbcForm({ ...lbcForm, client_name: e.target.value })}
-                                    placeholder="Client (optionnel)"
-                                    className="col-span-7 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-xs font-mono focus:outline-none placeholder:text-gray-600"
-                                />
-                            </div>
-                            <div className="grid grid-cols-12 gap-2 mt-2 mb-2">
-                                <input
-                                    data-testid="lbc-purchase-amount"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={lbcForm.amount}
-                                    onChange={(e) => setLbcForm({ ...lbcForm, amount: e.target.value })}
-                                    onKeyDown={(e) => { if (e.key === "Enter") addLbcPurchase(); }}
-                                    placeholder="Montant €"
-                                    className="col-span-8 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-red-400 text-base font-mono font-bold focus:outline-none"
-                                />
-                                <button
-                                    data-testid="lbc-purchase-add"
-                                    onClick={addLbcPurchase}
-                                    className="col-span-4 h-10 bg-red-600 hover:bg-red-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
-                                >
-                                    <Plus className="h-3.5 w-3.5" />
-                                    Ajouter
-                                </button>
-                            </div>
-                            <p className="text-[10px] text-gray-500 font-mono mb-2 leading-snug">
-                                💡 Si le nom client correspond à un paiement en attente, l&apos;achat sera automatiquement déduit de &laquo;&nbsp;dans ta poche&nbsp;&raquo; lors de l&apos;encaissement.
-                            </p>
-
-                            {lbcList.items.length > 0 && (
-                                <div className="space-y-1 max-h-40 overflow-y-auto mb-3">
-                                    {lbcList.items.map((p, idx) => {
-                                        const plat = p.platform || "leboncoin";
-                                        const isLinked = p.client_name && pending.items.some(
-                                            (pp) => (pp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase()
-                                        );
-                                        return (
-                                            <div
-                                                key={p.id}
-                                                data-testid={`lbc-item-${p.id}`}
-                                                className={`flex items-center justify-between gap-2 px-2 py-1.5 bg-[#0d0d0d] border ${isLinked ? "border-yellow-500/40" : "border-[#222222]"}`}
-                                            >
-                                                <span className="text-[10px] text-gray-500 font-mono shrink-0 w-6">
-                                                    #{lbcList.items.length - idx}
-                                                </span>
-                                                <span className="text-[9px] font-mono tracking-wider uppercase text-gray-400 shrink-0 px-1.5 py-0.5 border border-[#333333] bg-[#0a0a0a]">
-                                                    {plat}
-                                                </span>
-                                                {p.client_name && (
-                                                    <span
-                                                        className={`text-[10px] font-mono truncate ${isLinked ? "text-yellow-400" : "text-gray-500"}`}
-                                                        title={isLinked ? "Lié à un paiement en attente" : ""}
-                                                    >
-                                                        {isLinked ? "🔗 " : ""}{p.client_name}
-                                                    </span>
-                                                )}
-                                                <span className="font-mono text-sm font-bold text-red-400 flex-1 text-right">
-                                                    {fmt(p.amount)} €
-                                                </span>
-                                                <button
-                                                    data-testid={`lbc-delete-${p.id}`}
-                                                    onClick={() => deleteLbcPurchase(p.id)}
-                                                    className="text-gray-500 hover:text-red-500 transition-colors"
-                                                    aria-label="Supprimer"
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                             {balance.updated_at && (
                                 <p className="text-[10px] text-gray-500 font-mono mb-3">
                                     Dernière maj : {new Date(balance.updated_at).toLocaleString("fr-FR")}
@@ -1177,7 +1007,6 @@ export default function FinanceTab() {
                                 <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 35 prochains jours</div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
-                                <div className="flex justify-between"><span className="text-gray-400">− Achats en attente</span><span className="text-red-400">−{fmt(lbcList.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
                                 {upcomingUrssaf.length === 0 ? (
                                     <div className="flex justify-between">
@@ -1296,6 +1125,53 @@ export default function FinanceTab() {
                             placeholder="Description / note (optionnel)"
                             className="w-full h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
                         />
+
+                        {/* Coût matériel — déduit de "dans ta poche" (pas du CA) */}
+                        <div className="border border-red-500/30 bg-red-500/5 p-2.5 space-y-2">
+                            <label className="text-[10px] tracking-[0.2em] uppercase font-mono text-red-300 block">
+                                Coût matériel — ce que ça t&apos;a coûté
+                            </label>
+                            <input
+                                data-testid="entry-cost"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={entryForm.cost}
+                                onChange={(e) => setEntryForm({ ...entryForm, cost: e.target.value })}
+                                placeholder="Coût d'achat en € (optionnel)"
+                                className="w-full h-11 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-red-500 text-red-400 text-lg font-mono font-bold focus:outline-none"
+                            />
+                            {parseFloat(entryForm.cost) > 0 && parseFloat(entryForm.amount) > 0 && (() => {
+                                const total = parseFloat(entryForm.amount) || 0;
+                                const cost = parseFloat(entryForm.cost) || 0;
+                                const gcFee = isGoCardlessClient(entryForm.client_name) ? gocardlessFee(total) : 0;
+                                const netTotal = +(total - gcFee).toFixed(2);
+                                // Taux URSSAF selon catégorie (approximatif — hors split)
+                                let cat = entryForm.category === "autre"
+                                    ? (entryForm.autreRate || "prestation")
+                                    : entryForm.category;
+                                if (splitForm.enabled) cat = "materiel"; // approximation : gros de la valeur = matériel
+                                const taxRate = cat === "materiel" ? 0.135 : 0.231; // URSSAF+impôt+CFP approximatif
+                                const taxes = +(netTotal * taxRate).toFixed(2);
+                                const pocket = +(netTotal - taxes - cost).toFixed(2);
+                                return (
+                                    <div
+                                        data-testid="entry-pocket-preview"
+                                        className="flex items-center justify-between text-[10px] font-mono px-2 py-1.5 bg-[#0d0d0d] border border-green-500/30"
+                                    >
+                                        <span className="text-gray-400 tracking-wider">
+                                            💰 Estim. dans ta poche
+                                        </span>
+                                        <span className={`font-bold ${pocket >= 0 ? "text-green-400" : "text-red-500"}`}>
+                                            {pocket >= 0 ? "+" : ""}{fmt(pocket)} €
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                            <p className="text-[9px] text-gray-500 font-mono leading-snug">
+                                💡 Enregistré comme &laquo;&nbsp;achat&nbsp;&raquo; — impacte uniquement &laquo;&nbsp;dans ta poche&nbsp;&raquo;, pas le CA ni les taxes.
+                            </p>
+                        </div>
 
                         {/* GoCardless commission preview (auto déduite à l'enregistrement) */}
                         {isGoCardlessClient(entryForm.client_name) && parseFloat(entryForm.amount) > 0 && (
@@ -1416,13 +1292,10 @@ export default function FinanceTab() {
                         <div className="space-y-1 max-h-72 overflow-y-auto">
                             {pending.items.map((p) => {
                                 const cat = p.category || "materiel";
-                                // Un achat lié ne s'applique qu'aux pendings "matériel" (pas aux prestations)
-                                const linked = cat === "materiel"
-                                    ? lbcList.items.filter(
-                                        (lp) => (lp.client_name || "").trim().toLowerCase() === (p.client_name || "").trim().toLowerCase() && (p.client_name || "").trim()
-                                    )
-                                    : [];
-                                const linkedAmount = linked.reduce((s, lp) => s + (lp.amount || 0), 0);
+                                // LBC purchases removed → no linked purchases anymore.
+                                // Le coût matériel est désormais saisi directement sur l'entrée à l'encaissement.
+                                const linked = [];
+                                const linkedAmount = 0;
                                 // Aperçu marge nette avant encaissement
                                 // Taux total = URSSAF + impôt + CFP (13,5% matériel, 23,1% presta/formation)
                                 const rate = cat === "materiel" ? 0.135 : 0.231;
@@ -1767,391 +1640,6 @@ export default function FinanceTab() {
                 </SectionCard>
             </div>
 
-            {/* Paiements à préparer + Stock réel */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Paiements à préparer */}
-                <SectionCard>
-                    <SectionTitle icon={FileCheck2} accent="text-yellow-400">
-                        Paiements à préparer · {toPrepare.count || toPrepare.items.length}
-                        {toPrepare.total > 0 && ` · ${fmt(toPrepare.total)} €`}
-                    </SectionTitle>
-                    <p className="text-[10px] text-gray-500 font-mono mb-3">
-                        Devis à envoyer / factures à émettre — pour mémoire
-                    </p>
-                    <div className="grid grid-cols-12 gap-2 mb-3">
-                        <input
-                            data-testid="prepare-label"
-                            type="text"
-                            value={prepareForm.label}
-                            onChange={(e) => setPrepareForm({ ...prepareForm, label: e.target.value })}
-                            placeholder="Client + objet (ex: LUKADHESIF — nouveau PC)"
-                            className="col-span-8 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-white text-sm focus:outline-none"
-                        />
-                        <input
-                            data-testid="prepare-amount"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={prepareForm.amount}
-                            onChange={(e) => setPrepareForm({ ...prepareForm, amount: e.target.value })}
-                            placeholder="€ (optionnel)"
-                            className="col-span-4 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-yellow-500 text-yellow-300 text-sm font-mono focus:outline-none"
-                        />
-                        <button
-                            data-testid="prepare-add"
-                            onClick={addPrepare}
-                            className="col-span-12 h-9 bg-yellow-600 hover:bg-yellow-500 text-black text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
-                        >
-                            <Plus className="h-3 w-3" />
-                            Ajouter un devis à préparer
-                        </button>
-                    </div>
-
-                    {toPrepare.items.length === 0 ? (
-                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
-                            Aucun devis à préparer
-                        </p>
-                    ) : (
-                        <div className="space-y-1 max-h-60 overflow-y-auto">
-                            {toPrepare.items.map((p) => (
-                                <div
-                                    key={p.id}
-                                    data-testid={`prepare-item-${p.id}`}
-                                    className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-[#222222]"
-                                >
-                                    <span className="flex-1 text-sm text-white truncate">{p.label}</span>
-                                    {p.amount > 0 && (
-                                        <span className="font-mono text-sm font-bold text-yellow-300 shrink-0">
-                                            {fmt(p.amount)} €
-                                        </span>
-                                    )}
-                                    <button
-                                        data-testid={`prepare-delete-${p.id}`}
-                                        onClick={() => deletePrepare(p.id)}
-                                        className="text-gray-500 hover:text-red-500 transition-colors"
-                                        aria-label="Supprimer"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </SectionCard>
-
-                {/* Stock réel */}
-                <SectionCard>
-                    <SectionTitle icon={Wallet} accent="text-purple-400">
-                        Stock réel · {stock.fixes + stock.portables} pc · {fmt(stock.total_value)} €
-                    </SectionTitle>
-                    <p className="text-[10px] text-gray-500 font-mono mb-3">
-                        Pour info — n&apos;affecte ni le CA ni le prévisionnel
-                    </p>
-                    <div className="grid grid-cols-12 gap-2 mb-3">
-                        <input
-                            data-testid="stock-label"
-                            type="text"
-                            value={stockForm.label}
-                            onChange={(e) => setStockForm({ ...stockForm, label: e.target.value })}
-                            placeholder="Modèle (ex: Lenovo ThinkCentre Neo 50q Gen5)"
-                            className="col-span-7 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-white text-sm focus:outline-none"
-                        />
-                        <select
-                            data-testid="stock-kind"
-                            value={stockForm.kind}
-                            onChange={(e) => setStockForm({ ...stockForm, kind: e.target.value })}
-                            className="col-span-5 h-10 px-2 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                        >
-                            <option value="fixe">PC Fixe</option>
-                            <option value="portable">Portable</option>
-                        </select>
-                        <input
-                            data-testid="stock-serial"
-                            type="text"
-                            value={stockForm.serial}
-                            onChange={(e) => setStockForm({ ...stockForm, serial: e.target.value })}
-                            placeholder="N° série / Case N° (ex: YJ029KR0)"
-                            className="col-span-12 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-yellow-300 text-sm font-mono focus:outline-none"
-                        />
-
-                        {/* Specs structurées */}
-                        <div className="col-span-12 border border-[#333333] bg-[#0a0a0a] p-3 space-y-2">
-                            <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-purple-400 mb-2">Composants</div>
-
-                            {/* Écran + résolution — portable seulement */}
-                            {stockForm.kind === "portable" && (
-                                <div className="grid grid-cols-2 gap-2">
-                                    <select
-                                        value={stockForm.specs.screen}
-                                        onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, screen: e.target.value } })}
-                                        className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                    >
-                                        <option value="">Écran…</option>
-                                        <option value='14"'>14&quot;</option>
-                                        <option value='15,6"'>15,6&quot;</option>
-                                        <option value='16"'>16&quot;</option>
-                                        <option value='17"'>17&quot;</option>
-                                    </select>
-                                    <select
-                                        value={stockForm.specs.resolution}
-                                        onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, resolution: e.target.value } })}
-                                        className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                    >
-                                        <option value="">Résolution…</option>
-                                        <option value="FHD 1920x1080">FHD 1920x1080</option>
-                                        <option value="2K">2K</option>
-                                        <option value="4K">4K</option>
-                                        <option value="5K">5K</option>
-                                    </select>
-                                </div>
-                            )}
-
-                            {/* CPU */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <select
-                                    value={stockForm.specs.cpu_brand}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, cpu_brand: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">Marque CPU…</option>
-                                    <option value="Intel Core i3">Intel Core i3</option>
-                                    <option value="Intel Core i5">Intel Core i5</option>
-                                    <option value="Intel Core i7">Intel Core i7</option>
-                                    <option value="Intel Core i9">Intel Core i9</option>
-                                    <option value="AMD Ryzen 5">AMD Ryzen 5</option>
-                                    <option value="AMD Ryzen 7">AMD Ryzen 7</option>
-                                    <option value="AMD Ryzen 9">AMD Ryzen 9</option>
-                                </select>
-                                <select
-                                    value={stockForm.specs.cpu_model}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, cpu_model: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">Génération…</option>
-                                    <option value="11ème gén">11ème gén</option>
-                                    <option value="12ème gén">12ème gén</option>
-                                    <option value="13ème gén">13ème gén</option>
-                                    <option value="14ème gén">14ème gén</option>
-                                    <option value="15ème gén">15ème gén</option>
-                                </select>
-                            </div>
-
-                            {/* RAM + Storage */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <select
-                                    value={stockForm.specs.ram}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, ram: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">RAM…</option>
-                                    <option value="8 Go DDR4">8 Go DDR4</option>
-                                    <option value="16 Go DDR4">16 Go DDR4</option>
-                                    <option value="32 Go DDR4">32 Go DDR4</option>
-                                    <option value="8 Go DDR5">8 Go DDR5</option>
-                                    <option value="16 Go DDR5">16 Go DDR5</option>
-                                    <option value="32 Go DDR5">32 Go DDR5</option>
-                                    <option value="64 Go DDR5">64 Go DDR5</option>
-                                </select>
-                                <select
-                                    value={stockForm.specs.storage}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, storage: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">Stockage…</option>
-                                    <option value="NVMe 256 Go">NVMe 256 Go</option>
-                                    <option value="NVMe Hynix 512 Go">NVMe Hynix 512 Go</option>
-                                    <option value="NVMe 1 To">NVMe 1 To</option>
-                                    <option value="NVMe 2 To">NVMe 2 To</option>
-                                    <option value="SSD 512 Go">SSD 512 Go</option>
-                                    <option value="HDD 1 To">HDD 1 To</option>
-                                </select>
-                            </div>
-
-                            {/* GPU + Wifi */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <select
-                                    value={stockForm.specs.gpu}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, gpu: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">GPU…</option>
-                                    <option value="Intégré Intel">Intégré Intel</option>
-                                    <option value="Intégré AMD">Intégré AMD</option>
-                                    <option value="Nvidia RTX 3050">Nvidia RTX 3050</option>
-                                    <option value="Nvidia RTX 4050">Nvidia RTX 4050</option>
-                                    <option value="Nvidia RTX 4060">Nvidia RTX 4060</option>
-                                    <option value="Nvidia RTX 4070">Nvidia RTX 4070</option>
-                                </select>
-                                <select
-                                    value={stockForm.specs.wifi}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, wifi: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">Wifi…</option>
-                                    <option value="Wifi 5">Wifi 5</option>
-                                    <option value="Wifi 6">Wifi 6</option>
-                                    <option value="Wifi 6E">Wifi 6E</option>
-                                    <option value="Wifi 7">Wifi 7</option>
-                                    <option value="Aucun">Aucun</option>
-                                </select>
-                            </div>
-
-                            {/* Webcam + Garantie (portable only for webcam) */}
-                            <div className="grid grid-cols-2 gap-2">
-                                {stockForm.kind === "portable" ? (
-                                    <select
-                                        value={stockForm.specs.webcam}
-                                        onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, webcam: e.target.value } })}
-                                        className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                    >
-                                        <option value="">Webcam…</option>
-                                        <option value="Avec fermeture">Avec fermeture</option>
-                                        <option value="Sans fermeture">Sans fermeture</option>
-                                        <option value="Aucune">Aucune</option>
-                                    </select>
-                                ) : <span />}
-                                <select
-                                    value={stockForm.specs.warranty}
-                                    onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, warranty: e.target.value } })}
-                                    className="h-9 px-2 bg-[#0d0d0d] border border-[#222222] focus:border-purple-500 text-white text-[11px] font-mono focus:outline-none"
-                                >
-                                    <option value="">Garantie constructeur…</option>
-                                    <option value="1 an">1 an</option>
-                                    <option value="2 ans">2 ans</option>
-                                    <option value="3 ans">3 ans</option>
-                                </select>
-                            </div>
-
-                            {/* Checkboxes */}
-                            <div className="flex flex-wrap gap-4 pt-1">
-                                {stockForm.specs.wifi && stockForm.specs.wifi !== "Aucun" && (
-                                    <label className="flex items-center gap-2 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-400 cursor-pointer select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={!!stockForm.specs.bluetooth}
-                                            onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, bluetooth: e.target.checked } })}
-                                            className="h-3.5 w-3.5 accent-purple-500"
-                                        />
-                                        Bluetooth
-                                    </label>
-                                )}
-                                {stockForm.kind === "portable" && (
-                                    <label className="flex items-center gap-2 text-[10px] tracking-[0.15em] uppercase font-mono text-gray-400 cursor-pointer select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={!!stockForm.specs.keyboard_backlit}
-                                            onChange={(e) => setStockForm({ ...stockForm, specs: { ...stockForm.specs, keyboard_backlit: e.target.checked } })}
-                                            className="h-3.5 w-3.5 accent-purple-500"
-                                        />
-                                        Clavier rétro-éclairé
-                                    </label>
-                                )}
-                            </div>
-                        </div>
-
-                        <input
-                            data-testid="stock-qty"
-                            type="number"
-                            min="1"
-                            value={stockForm.quantity}
-                            onChange={(e) => setStockForm({ ...stockForm, quantity: e.target.value })}
-                            placeholder="Qté"
-                            className="col-span-4 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-gray-300 text-sm font-mono focus:outline-none"
-                        />
-                        <input
-                            data-testid="stock-unit-value"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={stockForm.unit_value}
-                            onChange={(e) => setStockForm({ ...stockForm, unit_value: e.target.value })}
-                            placeholder="Valeur unit. €"
-                            className="col-span-8 h-10 px-3 bg-[#0d0d0d] border border-[#333333] focus:border-purple-500 text-purple-300 text-sm font-mono focus:outline-none"
-                        />
-                        <button
-                            data-testid="stock-add"
-                            onClick={addStock}
-                            className="col-span-12 h-9 bg-purple-600 hover:bg-purple-500 text-white text-[10px] tracking-[0.15em] uppercase font-mono font-semibold flex items-center justify-center gap-1"
-                        >
-                            <Plus className="h-3 w-3" />
-                            Ajouter au stock
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">PC Fixes</div>
-                            <div className="font-mono text-lg font-bold text-purple-300">{stock.fixes}</div>
-                        </div>
-                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Portables</div>
-                            <div className="font-mono text-lg font-bold text-purple-300">{stock.portables}</div>
-                        </div>
-                    </div>
-
-                    {stock.items.length === 0 ? (
-                        <p className="text-[11px] text-gray-500 font-mono py-6 text-center border border-[#333333] border-dashed">
-                            Stock vide
-                        </p>
-                    ) : (
-                        <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                            {stock.items.map((s) => (
-                                <div
-                                    key={s.id}
-                                    data-testid={`stock-item-${s.id}`}
-                                    className="bg-[#0d0d0d] border border-[#222222] p-2"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[9px] tracking-[0.15em] uppercase font-mono text-purple-400 w-14 shrink-0">
-                                            {s.kind === "portable" ? "PORT." : "FIXE"}
-                                        </span>
-                                        <span className="flex-1 text-sm text-white truncate">{s.label}</span>
-                                        <span className="font-mono text-[11px] text-gray-400 shrink-0">×{s.quantity}</span>
-                                        {s.unit_value > 0 && (
-                                            <span className="font-mono text-sm font-bold text-purple-300 shrink-0">
-                                                {fmt(s.quantity * s.unit_value)} €
-                                            </span>
-                                        )}
-                                        <button
-                                            data-testid={`stock-delete-${s.id}`}
-                                            onClick={() => deleteStock(s.id)}
-                                            className="text-gray-500 hover:text-red-500 transition-colors"
-                                            aria-label="Supprimer"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                    {s.serial && (
-                                        <div className="text-[10px] text-yellow-400/80 font-mono mt-1 ml-16">
-                                            S/N : {s.serial}
-                                        </div>
-                                    )}
-                                    {s.specs && typeof s.specs === "object" && Object.values(s.specs).some((v) => v !== "" && v !== false) && (
-                                        <div className="text-[10px] text-gray-400 font-mono mt-1 ml-16 grid grid-cols-2 gap-x-3 gap-y-0.5">
-                                            {s.specs.screen && <div><span className="text-gray-600">Écran :</span> {s.specs.screen}</div>}
-                                            {s.specs.resolution && <div><span className="text-gray-600">Résolution :</span> {s.specs.resolution}</div>}
-                                            {(s.specs.cpu_brand || s.specs.cpu_model) && <div className="col-span-2"><span className="text-gray-600">CPU :</span> {[s.specs.cpu_brand, s.specs.cpu_model].filter(Boolean).join(" · ")}</div>}
-                                            {s.specs.ram && <div><span className="text-gray-600">RAM :</span> {s.specs.ram}</div>}
-                                            {s.specs.storage && <div><span className="text-gray-600">Disque :</span> {s.specs.storage}</div>}
-                                            {s.specs.gpu && <div><span className="text-gray-600">GPU :</span> {s.specs.gpu}</div>}
-                                            {s.specs.wifi && <div><span className="text-gray-600">Wifi :</span> {s.specs.wifi}{s.specs.bluetooth ? " + BT" : ""}</div>}
-                                            {s.specs.webcam && <div><span className="text-gray-600">Webcam :</span> {s.specs.webcam}</div>}
-                                            {s.specs.keyboard_backlit && <div><span className="text-gray-600">Clavier :</span> rétro-éclairé</div>}
-                                            {s.specs.warranty && <div className="col-span-2"><span className="text-gray-600">Garantie :</span> <span className="text-green-400">{s.specs.warranty}</span></div>}
-                                        </div>
-                                    )}
-                                    {/* fallback : ancien format texte libre */}
-                                    {s.specs && typeof s.specs === "string" && s.specs && (
-                                        <pre className="text-[10px] text-gray-400 font-mono mt-1 ml-16 whitespace-pre-wrap leading-relaxed">
-                                            {s.specs}
-                                        </pre>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </SectionCard>
-            </div>
 
             {/* Mémo — Versements femme */}
             <SectionCard>
