@@ -1,0 +1,31 @@
+{
+  "summary": "Verified removal of 3 UI blocks (Achats en attente, Paiements à préparer, Stock réel) and end-to-end 'Coût matériel' feature. Fresh headless load confirms all 3 blocks are absent from DOM. entry-cost input renders inside the 'Saisir une entrée' card, entry-pocket-preview shows correct estimates (+72,92€ for prestation 680€/cost 450€ and +138,20€ for matériel). Backend confirms POST /api/finance/entries with category='achat' persists and impacts summary.achats and summary.net_in_pocket (CA − taxes − achats). All 4 pytest cases pass. User's reported sighting of 'Achats en attente' is almost certainly stale browser cache — a hard refresh / cache purge will resolve it.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_finance_cost.py",
+    "/app/test_reports/pytest/pytest_finance_cost.xml"
+  ],
+  "action_items": [
+    "Tell user to do a hard refresh (Ctrl+Shift+R / Cmd+Shift+R) or empty cache — code is clean, only stale bundle in their browser."
+  ],
+  "critical_code_review_comments": [
+    "FinanceTab.jsx is 1873 lines — should be split into sub-components (EntryForm, AccountState, Recap, Projection) for maintainability.",
+    "Dead code: LbcPurchase / StockItem / PaymentToPrepare Pydantic models remain in backend/finance.py while the corresponding UI blocks are removed. If backend endpoints for these are also unused, they should be pruned.",
+    "balance model still carries lbc_pending field (always set to 0 from FE) — consider removing to reduce schema noise."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_finance_cost.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "MongoDB TEST_TOKEN_DO_NOT_USE_IN_PROD inserted+cleaned in portal_sessions (per /app/memory/test_credentials.md).",
+  "seed_data_creation": "Test entries prefixed TEST_ auto-cleaned in each test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest lives at /app/backend/tests/test_finance_cost.py — reusable for regression. Frontend selectors used: [data-testid=finance-tab], entry-cost, entry-pocket-preview, entry-amount, entry-category, net-pocket-current. To auth, insert portal_sessions doc with token TEST_TOKEN_DO_NOT_USE_IN_PROD then localStorage.setItem('portal_token', ...).",
+  "rca of the issue": "User reported seeing removed 'Achats en attente' block. Code inspection + fresh headless page load confirms the block is absent from the deployed bundle. Root cause: browser cache serving stale JS bundle. Mitigation: hard refresh or clear site data."
+}
