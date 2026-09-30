@@ -74,20 +74,6 @@ const SectionTitle = ({ icon: Icon, children, accent }) => (
     </div>
 );
 
-const StatBox = ({ label, value, color = "text-white", testid, sub }) => (
-    <div data-testid={testid} className="border border-[#333333] bg-[#0d0d0d] p-3">
-        <div className="text-[10px] tracking-[0.2em] uppercase font-mono text-gray-500">
-            {label}
-        </div>
-        <div className={`font-mono text-xl font-bold mt-1 ${color}`}>
-            {typeof value === "number" ? `${fmt(value)} €` : value}
-        </div>
-        {sub && (
-            <div className="text-[10px] text-gray-500 font-mono mt-0.5">{sub}</div>
-        )}
-    </div>
-);
-
 export default function FinanceTab() {
     const today = new Date().toISOString().slice(0, 10);
     const [month, setMonth] = useState(today.slice(0, 7));
@@ -774,74 +760,6 @@ export default function FinanceTab() {
                                     })()
                                 )}
                             </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
-                                <StatBox label="CA Total" value={cur.total_ca} color="text-yellow-500" testid="ca-total" />
-                                <StatBox label="Total taxes" value={cur.total_taxes} color="text-red-400" testid="total-taxes" sub="à provisionner" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-ventes">
-                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC ventes</div>
-                                    <div className="font-mono text-base font-semibold text-orange-400 mt-0.5">{fmt(cur.materiel)} €</div>
-                                </div>
-                                <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-presta">
-                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC presta</div>
-                                    <div className="font-mono text-base font-semibold text-blue-400 mt-0.5">{fmt(cur.presta + cur.formation)} €</div>
-                                </div>
-                            </div>
-
-                            {prev && (
-                                <div className="mt-4 pt-4 border-t border-[#333333]">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-gray-400">
-                                            {monthLabel(summary.previous_month)} (mois précédent)
-                                        </div>
-                                        <button
-                                            data-testid="reset-previous-month"
-                                            type="button"
-                                            onClick={() => resetMonth(summary.previous_month)}
-                                            className="inline-flex items-center gap-1 px-2 h-6 border border-red-500/40 hover:bg-red-500/10 text-red-400 text-[9px] tracking-[0.15em] uppercase font-mono transition-colors"
-                                            title={`Réinitialiser ${monthLabel(summary.previous_month)}`}
-                                        >
-                                            <RotateCcw className="h-3 w-3" />
-                                            Reset
-                                        </button>
-                                    </div>
-
-                                    <div
-                                        data-testid="net-pocket-previous"
-                                        className="bg-[#0d0d0d] border border-green-500/25 p-4 mb-3"
-                                    >
-                                        <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-green-400/80 mb-1">
-                                            Dans ta poche
-                                        </div>
-                                        <div className="font-mono text-2xl md:text-3xl font-bold text-green-400/90 tracking-tight">
-                                            {fmt(prev.net_in_pocket ?? prev.net_after_taxes)} <span className="text-lg text-gray-500">€</span>
-                                        </div>
-                                        {(prev.achats || 0) > 0 && (
-                                            <div className="text-[10px] text-gray-500 font-mono mt-1">
-                                                dont − {fmt(prev.achats)} € de dépenses déduites
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        <StatBox label="CA Total" value={prev.total_ca} color="text-yellow-300/80" testid="prev-ca-total" />
-                                        <StatBox label="Total taxes" value={prev.total_taxes} color="text-red-300/80" testid="prev-total-taxes" />
-                                        <StatBox label="Net après taxes" value={prev.net_after_taxes} color="text-green-400/80" testid="prev-net-after-taxes" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 mt-2">
-                                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC ventes préc.</div>
-                                            <div className="font-mono text-base font-semibold text-orange-300/80 mt-0.5">{fmt(prev.materiel)} €</div>
-                                        </div>
-                                        <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                            <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC presta préc.</div>
-                                            <div className="font-mono text-base font-semibold text-blue-300/80 mt-0.5">{fmt(prev.presta + prev.formation)} €</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </SectionCard>
 
                         {/* Account state */}
