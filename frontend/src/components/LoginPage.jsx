@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import { ShieldCheck, Loader2, AlertCircle, LogIn } from "lucide-react";
+import { Loader2, AlertCircle, LogIn } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TOKEN_KEY = "portal_token";
@@ -89,8 +89,13 @@ export default function LoginPage({ onLogin, error }) {
                 <div className="absolute bottom-0 right-0 w-3 h-3 border-r border-b border-yellow-500" />
 
                 <div className="flex items-center gap-3 mb-8">
-                    <div className="h-10 w-10 bg-yellow-500 flex items-center justify-center">
-                        <ShieldCheck className="h-6 w-6 text-black" strokeWidth={2.5} />
+                    <div className="h-11 w-11 bg-white border border-[#333333] flex items-center justify-center overflow-hidden">
+                        <img
+                            src="/logo-si.png"
+                            alt="Solution Informatique"
+                            className="h-9 w-9 object-contain"
+                            data-testid="login-logo"
+                        />
                     </div>
                     <div className="flex flex-col leading-tight">
                         <span className="text-[10px] tracking-[0.25em] uppercase text-gray-500 font-mono">

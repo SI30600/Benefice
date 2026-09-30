@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { Cpu, TrendingUp, TrendingDown, Activity, Zap, Wrench, Calculator as CalcIcon, Wallet } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, Zap, Wrench, Calculator as CalcIcon, Wallet } from "lucide-react";
 import CalcForm from "@/components/CalcForm";
 import ResultPanel from "@/components/ResultPanel";
 import AssemblyForm from "@/components/AssemblyForm";
@@ -193,8 +193,13 @@ export default function Calculator() {
             <header className="border-b border-[#262626]">
                 <div className="max-w-7xl mx-auto px-6 md:px-12 py-5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-yellow-500 flex items-center justify-center">
-                            <Cpu className="h-5 w-5 text-black" strokeWidth={2.5} />
+                        <div className="h-10 w-10 bg-white border border-[#333333] flex items-center justify-center overflow-hidden">
+                            <img
+                                src="/logo-si.png"
+                                alt="Solution Informatique"
+                                className="h-8 w-8 object-contain"
+                                data-testid="app-logo"
+                            />
                         </div>
                         <div className="flex flex-col leading-tight">
                             <span className="text-[10px] tracking-[0.25em] uppercase text-gray-500 font-mono">

@@ -1,0 +1,29 @@
+{
+  "summary": "Validated both changes on Suivi Finance tab: (1) 'Détail URSSAF à déclarer' block is fully removed from DOM (grep + rendered HTML both confirm no occurrence of 'Détail URSSAF à déclarer', 'URSSAF ventes', 'URSSAF presta 21', 'Total à payer'). (2) New 'Historique dans ta poche · 12 derniers mois' block renders correctly with data-testid='pocket-history-chart' + data-testid='pocket-history-stats'. Backend endpoint GET /api/finance/pocket-history?months=12 returns 12 months oldest→newest, requires auth (401 without token), math matches compute_summary exactly, and respects the months query param. Seeded data (materiel 800€ current month + prestation 1500€ / achat 200€ previous month) produced correct values: sept pocket=692€ (800 − 108 taxes), août pocket=953,50€ (1500 − 346,50 − 200). Chart rendered 14 bar rectangles (12 months × including duplicates from active bars) with correct axes and stats: Total cumulé 1 645,50€ / Moyenne 822,75€ / Meilleur mois août 2026 (953,50€). SEED_HIST_V2 data cleaned up. 5/5 pytest cases pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Suivi Finance — Historique bloc", "issues": ["Recharts warns 'width(-1) height(-1)' at first render (a few frames before container measures). Harmless, purely a console-warning noise. Could be silenced by giving ResponsiveContainer a fixed minWidth/aspect."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pocket_history.py",
+    "/app/test_reports/pytest/pytest_pocket_history.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FinanceTab.jsx now 1961 lines — still growing. Extract PocketHistoryChart into a sub-component (recommended in prev iteration too).",
+    "Endpoint iterates one Mongo query per month (12 queries). For 12 months it's fine, but a single aggregation with $group by month prefix would scale better.",
+    "Recharts 'width(-1) height(-1)' console warning at first paint — cosmetic only."
+  ],
+  "updated_files": ["/app/backend/tests/test_pocket_history.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "MongoDB portal_sessions token TEST_TOKEN_DO_NOT_USE_IN_PROD (email contact@solutioninformatique.fr) — re-upserted, still valid 24h.",
+  "seed_data_creation": "Inserted 3 entries prefixed client_name='SEED_HIST_V2' (1 materiel current month, 1 prestation + 1 achat previous month) to visually validate the bar chart, then deleted them. DB is clean.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression for pocket-history lives at /app/backend/tests/test_pocket_history.py (5 tests, all passing). Frontend selectors used: [data-testid=finance-tab] to switch tab, [data-testid=pocket-history-chart] for the bar chart container, [data-testid=pocket-history-stats] for the 3-stat grid. Auth via localStorage.setItem('portal_token', 'TEST_TOKEN_DO_NOT_USE_IN_PROD'). Empty-state ('Pas encore de données…') appears when all 12 months have pocket==0 — seed data if you need to see bars.",
+  "rca of the issue": "N/A — no bugs found. Both requested changes are implemented correctly and math matches compute_summary."
+}
