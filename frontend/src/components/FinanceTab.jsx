@@ -5,7 +5,7 @@ import {
     AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
     FileCheck2, ExternalLink, TrendingUp, RotateCcw, Package, Pencil, X,
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell, LabelList } from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -97,6 +97,7 @@ export default function FinanceTab() {
     const [charges, setCharges] = useState({ items: [], total: 0 });
     const [revenues, setRevenues] = useState({ items: [], total: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
+    const [pocketHistory, setPocketHistory] = useState([]);
     // Override URSSAF désactivé : on utilise toujours l'auto-calcul depuis le CA réel
     // Variables maintenues pour compatibilité avec le reste du code (always 0)
     const urssafNextOverride = "";
@@ -129,7 +130,7 @@ export default function FinanceTab() {
     const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumR, entR, penR, balR, chargesR, revR, wifeR] = await Promise.all([
+            const [sumR, entR, penR, balR, chargesR, revR, wifeR, histR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
@@ -137,6 +138,7 @@ export default function FinanceTab() {
                 axios.get(`${API}/finance/monthly-charges`),
                 axios.get(`${API}/finance/recurring-revenues`),
                 axios.get(`${API}/finance/wife-payments?month=${month}`),
+                axios.get(`${API}/finance/pocket-history?months=12`),
             ]);
             setSummary(sumR.data);
             setEntries(entR.data);
@@ -145,6 +147,7 @@ export default function FinanceTab() {
             setCharges(chargesR.data);
             setRevenues(revR.data);
             setWife(wifeR.data);
+            setPocketHistory(histR.data.months || []);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
         } catch (e) {
@@ -796,42 +799,6 @@ export default function FinanceTab() {
                                 <div className="border border-[#333333] bg-[#0d0d0d] p-2" data-testid="cur-bic-presta">
                                     <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">BIC presta</div>
                                     <div className="font-mono text-base font-semibold text-blue-400 mt-0.5">{fmt(cur.presta + cur.formation)} €</div>
-                                </div>
-                            </div>
-
-                            {/* Détail URSSAF — à checker avant déclaration */}
-                            <div className="mt-3 border border-orange-500/40 bg-[#0d0d0d] p-3" data-testid="urssaf-breakdown">
-                                <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-orange-400 mb-2">
-                                    Détail URSSAF à déclarer
-                                </div>
-                                <div className="space-y-1 text-[11px] font-mono">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400">URSSAF ventes <span className="text-gray-600">(12,3%)</span></span>
-                                        <span className="text-orange-400">{fmt(cur.urssaf_materiel)} €</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400">URSSAF presta <span className="text-gray-600">(21,2%)</span></span>
-                                        <span className="text-orange-400">{fmt(cur.urssaf_presta + (cur.urssaf_formation || 0))} €</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400">Impôt ventes <span className="text-gray-600">(1%)</span></span>
-                                        <span className="text-orange-400">{fmt(cur.impot_vente)} €</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400">Impôt presta <span className="text-gray-600">(1,7%)</span></span>
-                                        <span className="text-orange-400">{fmt(cur.impot_presta + (cur.impot_formation || 0))} €</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400">CFP <span className="text-gray-600">(0,2%)</span></span>
-                                        <span className="text-orange-400">{fmt(cur.cfp)} €</span>
-                                    </div>
-                                    <div className="flex justify-between pt-1.5 mt-1.5 border-t border-[#333333]">
-                                        <span className="text-white font-semibold uppercase tracking-wider text-[10px]">Total à payer</span>
-                                        <span className="text-red-400 font-bold text-base">{fmt(cur.total_taxes)} €</span>
-                                    </div>
-                                </div>
-                                <div className="text-[9px] text-gray-500 font-mono mt-2">
-                                    Prélèvement prévu le 4 {monthLabel(nextMonth(month))}
                                 </div>
                             </div>
 
@@ -1639,6 +1606,127 @@ export default function FinanceTab() {
                     )}
                 </SectionCard>
             </div>
+
+
+            {/* Historique "Dans ta poche" — 12 derniers mois */}
+            <SectionCard>
+                <SectionTitle icon={TrendingUp} accent="text-green-400">
+                    Historique dans ta poche · 12 derniers mois
+                </SectionTitle>
+                {(() => {
+                    const nonZero = pocketHistory.filter((h) => (h.pocket || 0) !== 0);
+                    if (nonZero.length === 0) {
+                        return (
+                            <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed">
+                                Pas encore de données sur les 12 derniers mois
+                            </p>
+                        );
+                    }
+                    const total = pocketHistory.reduce((s, h) => s + (h.pocket || 0), 0);
+                    const positive = pocketHistory.filter((h) => (h.pocket || 0) > 0);
+                    const avg = positive.length > 0 ? total / positive.length : 0;
+                    const best = pocketHistory.reduce(
+                        (b, h) => ((h.pocket || 0) > (b.pocket || -Infinity) ? h : b),
+                        pocketHistory[0] || {}
+                    );
+                    const chartData = pocketHistory.map((h) => {
+                        const [yy, mm] = h.month.split("-");
+                        const shortLabel = monthLabel(h.month).split(" ")[0].slice(0, 3);
+                        return {
+                            ...h,
+                            label: `${shortLabel} ${yy.slice(2)}`,
+                            fullLabel: monthLabel(h.month),
+                            pocket: +(h.pocket || 0).toFixed(2),
+                            _mm: mm,
+                        };
+                    });
+                    const bestKey = best.month;
+                    return (
+                        <>
+                            <div className="grid grid-cols-3 gap-2 mb-4" data-testid="pocket-history-stats">
+                                <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Total cumulé</div>
+                                    <div className={`font-mono text-lg font-bold ${total >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                        {fmt(total)} €
+                                    </div>
+                                </div>
+                                <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Moyenne / mois actif</div>
+                                    <div className="font-mono text-lg font-bold text-green-300">{fmt(avg)} €</div>
+                                </div>
+                                <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Meilleur mois</div>
+                                    <div className="font-mono text-sm font-bold text-green-400">
+                                        {fmt(best.pocket || 0)} €
+                                    </div>
+                                    <div className="text-[9px] text-gray-500 font-mono">
+                                        {best.month ? monthLabel(best.month) : "—"}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ width: "100%", height: 260 }} data-testid="pocket-history-chart">
+                                <ResponsiveContainer>
+                                    <BarChart data={chartData} margin={{ top: 20, right: 12, left: 0, bottom: 8 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#222222" vertical={false} />
+                                        <XAxis
+                                            dataKey="label"
+                                            tick={{ fill: "#888", fontSize: 10, fontFamily: "monospace" }}
+                                            axisLine={{ stroke: "#333" }}
+                                            tickLine={false}
+                                        />
+                                        <YAxis
+                                            tick={{ fill: "#666", fontSize: 10, fontFamily: "monospace" }}
+                                            axisLine={{ stroke: "#333" }}
+                                            tickLine={false}
+                                            tickFormatter={(v) => `${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v}`}
+                                            width={44}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                background: "#0d0d0d",
+                                                border: "1px solid #333",
+                                                fontFamily: "monospace",
+                                                fontSize: 11,
+                                            }}
+                                            labelStyle={{ color: "#eab308", textTransform: "uppercase", letterSpacing: "0.15em" }}
+                                            formatter={(v, _n, p) => [
+                                                `${fmt(v)} €`,
+                                                p.payload.fullLabel,
+                                            ]}
+                                            cursor={{ fill: "#eab30822" }}
+                                        />
+                                        <ReferenceLine y={0} stroke="#444" />
+                                        <Bar dataKey="pocket" radius={[3, 3, 0, 0]}>
+                                            {chartData.map((entry) => (
+                                                <Cell
+                                                    key={entry.month}
+                                                    fill={
+                                                        entry.month === bestKey && entry.pocket > 0
+                                                            ? "#22c55e"
+                                                            : entry.pocket >= 0
+                                                                ? "#16a34a"
+                                                                : "#dc2626"
+                                                    }
+                                                    fillOpacity={entry.month === bestKey && entry.pocket > 0 ? 1 : 0.75}
+                                                />
+                                            ))}
+                                            <LabelList
+                                                dataKey="pocket"
+                                                position="top"
+                                                formatter={(v) => (v ? fmt(v) : "")}
+                                                style={{ fill: "#9ca3af", fontFamily: "monospace", fontSize: 9 }}
+                                            />
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <p className="text-[9px] text-gray-500 font-mono mt-2 leading-snug">
+                                💡 &laquo;&nbsp;Dans ta poche&nbsp;&raquo; = CA − taxes − dépenses (achats). Barre plus foncée = meilleur mois.
+                            </p>
+                        </>
+                    );
+                })()}
+            </SectionCard>
 
 
             {/* Mémo — Versements femme */}

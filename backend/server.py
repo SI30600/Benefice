@@ -254,6 +254,37 @@ async def get_finance_summary(month: Optional[str] = None, _=Depends(require_aut
     }
 
 
+@api_router.get("/finance/pocket-history")
+async def get_pocket_history(months: int = 12, _=Depends(require_auth)):
+    """Historique 'Dans ta poche' des N derniers mois (par défaut 12) pour le mini bar chart."""
+    months = max(1, min(24, int(months or 12)))
+    today = datetime.now(timezone.utc).date()
+    y, m = today.year, today.month
+    history = []
+    for _i in range(months):
+        month_key = f"{y:04d}-{m:02d}"
+        rows = await db.finance_entries.find(
+            {"date": {"$regex": f"^{month_key}-"}}, {"_id": 0}
+        ).to_list(2000)
+        s = compute_summary(rows)
+        history.append({
+            "month": month_key,
+            "pocket": s["net_in_pocket"],
+            "ca": s["total_ca"],
+            "taxes": s["total_taxes"],
+            "achats": s["achats"],
+        })
+        # step back one month
+        if m == 1:
+            m = 12
+            y -= 1
+        else:
+            m -= 1
+    # oldest first for chart display
+    history.reverse()
+    return {"months": history, "count": len(history)}
+
+
 # ---- Finance: pending payments ----------------------------------------------
 
 @api_router.post("/finance/pending", response_model=PendingPayment)
