@@ -168,11 +168,23 @@ async def create_finance_entry(payload: FinanceEntryCreate, _=Depends(require_au
 
 
 @api_router.get("/finance/entries")
-async def list_finance_entries(month: Optional[str] = None, _=Depends(require_auth)):
-    """List entries; optional `month` filter as YYYY-MM."""
+async def list_finance_entries(
+    month: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    _=Depends(require_auth),
+):
+    """List entries; optional `month` filter (YYYY-MM) or `date_from`/`date_to` range (YYYY-MM-DD inclusive)."""
     query: Dict[str, Any] = {}
     if month:
         query["date"] = {"$regex": f"^{month}-"}
+    elif date_from or date_to:
+        date_q: Dict[str, Any] = {}
+        if date_from:
+            date_q["$gte"] = date_from
+        if date_to:
+            date_q["$lte"] = date_to
+        query["date"] = date_q
     rows = await db.finance_entries.find(query, {"_id": 0}).sort("date", -1).to_list(2000)
     return rows
 

@@ -84,6 +84,7 @@ export default function FinanceTab() {
     const [revenues, setRevenues] = useState({ items: [], total: 0 });
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
     const [pocketHistory, setPocketHistory] = useState([]);
+    const [upcomingEntries, setUpcomingEntries] = useState([]);
     // Override URSSAF désactivé : on utilise toujours l'auto-calcul depuis le CA réel
     // Variables maintenues pour compatibilité avec le reste du code (always 0)
     const urssafNextOverride = "";
@@ -116,7 +117,13 @@ export default function FinanceTab() {
     const refresh = useCallback(async () => {
         setLoading(true);
         try {
-            const [sumR, entR, penR, balR, chargesR, revR, wifeR, histR] = await Promise.all([
+            const todayIso = new Date().toISOString().slice(0, 10);
+            const futureIso = (() => {
+                const d = new Date();
+                d.setDate(d.getDate() + 95);
+                return d.toISOString().slice(0, 10);
+            })();
+            const [sumR, entR, penR, balR, chargesR, revR, wifeR, histR, upR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
@@ -125,6 +132,7 @@ export default function FinanceTab() {
                 axios.get(`${API}/finance/recurring-revenues`),
                 axios.get(`${API}/finance/wife-payments?month=${month}`),
                 axios.get(`${API}/finance/pocket-history?months=12`),
+                axios.get(`${API}/finance/entries?date_from=${todayIso}&date_to=${futureIso}`),
             ]);
             setSummary(sumR.data);
             setEntries(entR.data);
@@ -134,6 +142,7 @@ export default function FinanceTab() {
             setRevenues(revR.data);
             setWife(wifeR.data);
             setPocketHistory(histR.data.months || []);
+            setUpcomingEntries(upR.data || []);
             setBalanceInput(String(balR.data.balance ?? 0));
             setCbDeferredInput(String(balR.data.cb_deferred ?? 0));
         } catch (e) {
@@ -502,6 +511,21 @@ export default function FinanceTab() {
         [upcomingUrssaf]
     );
 
+    // Saisies futures dans les 35 prochains jours (CA − achats) — net impact sur le cash
+    const upcomingEntriesNet35 = useMemo(() => {
+        if (!upcomingEntries || upcomingEntries.length === 0) return 0;
+        const now = new Date();
+        const todayKey = now.toISOString().slice(0, 10);
+        const horizon = new Date(now);
+        horizon.setDate(horizon.getDate() + 35);
+        const horizonKey = horizon.toISOString().slice(0, 10);
+        return upcomingEntries.reduce((s, e) => {
+            if (!e.date || e.date <= todayKey || e.date > horizonKey) return s;
+            const amt = Number(e.amount) || 0;
+            return s + (e.category === "achat" ? -amt : amt);
+        }, 0);
+    }, [upcomingEntries]);
+
     const projected = useMemo(() => {
         if (!cur) return 0;
         const real = parseFloat(balanceInput) || 0;
@@ -510,12 +534,13 @@ export default function FinanceTab() {
             real
             + pending.total
             + revenuesUpcomingTotal
+            + upcomingEntriesNet35
             - totalUpcomingUrssaf
             - extraCurrentMonthUrssaf
             - cb
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf]);
+    }, [balanceInput, cbDeferredInput, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf, upcomingEntriesNet35]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -546,6 +571,20 @@ export default function FinanceTab() {
             const key = d.toISOString().slice(0, 10);
             if (key in eventsByDate) eventsByDate[key] += pending.total;
         }
+
+        // Saisies futures (date > aujourd'hui) : CA ajouté, achats soustraits à la date exacte
+        // Permet de voir l'impact immédiat quand on saisit une entrée datée dans le mois en cours ou à venir
+        const todayKey = now.toISOString().slice(0, 10);
+        (upcomingEntries || []).forEach((e) => {
+            if (!e.date || e.date <= todayKey) return;
+            if (!(e.date in eventsByDate)) return;
+            const amt = Number(e.amount) || 0;
+            if (e.category === "achat") {
+                eventsByDate[e.date] -= amt;
+            } else {
+                eventsByDate[e.date] += amt;
+            }
+        });
 
         (charges.items || []).forEach((c) => {
             for (let i = 0; i <= HORIZON_DAYS; i++) {
@@ -621,7 +660,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles]);
+    }, [balanceInput, cbDeferredInput, pending.total, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles, upcomingEntries]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
@@ -669,6 +708,7 @@ export default function FinanceTab() {
                             <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-orange-400 mb-1">
                                 Montant BIC ventes
                             </div>
+
                             <div className="text-[11px] text-gray-500 font-mono mb-3 leading-relaxed">
                                 Ventes de marchandises (matériel)
                             </div>
@@ -693,9 +733,68 @@ export default function FinanceTab() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        {/* Courbe prévisionnelle du mois */}
+                    <SectionCard>
+                        <SectionTitle icon={TrendingUp} accent="text-cyan-400">
+                            Prévisionnel glissant · 90 prochains jours
+                        </SectionTitle>
+                        <p className="text-[10px] text-gray-500 font-mono mb-4">
+                            Projection du solde sur 90 jours — prélèvements, abos récurrents et URSSAF M+1 intégrés
+                            {projectionMin < 0 && (
+                                <span className="ml-2 text-red-400">⚠ point bas prévu : {fmt(projectionMin)} €</span>
+                            )}
+                        </p>
+
+                        {projectionData.length === 0 ? (
+                            <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed">
+                                Pas de données à projeter
+                            </p>
+                        ) : (
+                            <div className="h-72 w-full" data-testid="projection-chart">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={projectionData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                                        <XAxis
+                                            dataKey="label"
+                                            stroke="#666"
+                                            tick={{ fill: "#888", fontSize: 10, fontFamily: "monospace" }}
+                                            interval="preserveStartEnd"
+                                            minTickGap={25}
+                                        />
+                                        <YAxis
+                                            stroke="#666"
+                                            tick={{ fill: "#888", fontSize: 11, fontFamily: "monospace" }}
+                                            tickFormatter={(v) => `${Math.round(v)} €`}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                background: "#0d0d0d",
+                                                border: "1px solid #333",
+                                                fontFamily: "monospace",
+                                                fontSize: 12,
+                                            }}
+                                            labelStyle={{ color: "#eab308" }}
+                                            labelFormatter={(lbl) => `Jour ${lbl}`}
+                                            formatter={(value) => [`${fmt(value)} €`, "Solde projeté"]}
+                                        />
+                                        <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "0 €", fill: "#ef4444", fontSize: 10, position: "insideRight" }} />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="solde"
+                                            stroke="#22d3ee"
+                                            strokeWidth={2}
+                                            dot={{ fill: "#22d3ee", r: 3 }}
+                                            activeDot={{ r: 5 }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </SectionCard>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                         {/* Récapitulatif compact */}
-                        <SectionCard className="lg:col-span-2">
+                        <SectionCard>
                             <SectionTitle icon={Receipt}>Récapitulatif</SectionTitle>
                             <div className="flex items-center justify-between mb-2">
                                 <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-yellow-500">
@@ -880,6 +979,14 @@ export default function FinanceTab() {
                                 <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 35 prochains jours</div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
+                                {upcomingEntriesNet35 !== 0 && (
+                                    <div className="flex justify-between" data-testid="upcoming-entries-line">
+                                        <span className="text-gray-400">{upcomingEntriesNet35 >= 0 ? "+ Saisies futures" : "− Saisies futures (achats)"}</span>
+                                        <span className={upcomingEntriesNet35 >= 0 ? "text-green-400" : "text-red-400"}>
+                                            {upcomingEntriesNet35 >= 0 ? "+" : "−"}{fmt(Math.abs(upcomingEntriesNet35))} €
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
                                 {upcomingUrssaf.length === 0 ? (
                                     <div className="flex justify-between">
@@ -1259,65 +1366,6 @@ export default function FinanceTab() {
                     )}
                 </SectionCard>
             </div>
-
-            {/* Courbe prévisionnelle du mois */}
-            <SectionCard>
-                <SectionTitle icon={TrendingUp} accent="text-cyan-400">
-                    Prévisionnel glissant · 90 prochains jours
-                </SectionTitle>
-                <p className="text-[10px] text-gray-500 font-mono mb-4">
-                    Projection du solde sur 90 jours — prélèvements, abos récurrents et URSSAF M+1 intégrés
-                    {projectionMin < 0 && (
-                        <span className="ml-2 text-red-400">⚠ point bas prévu : {fmt(projectionMin)} €</span>
-                    )}
-                </p>
-
-                {projectionData.length === 0 ? (
-                    <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed">
-                        Pas de données à projeter
-                    </p>
-                ) : (
-                    <div className="h-72 w-full" data-testid="projection-chart">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={projectionData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                                <XAxis
-                                    dataKey="label"
-                                    stroke="#666"
-                                    tick={{ fill: "#888", fontSize: 10, fontFamily: "monospace" }}
-                                    interval="preserveStartEnd"
-                                    minTickGap={25}
-                                />
-                                <YAxis
-                                    stroke="#666"
-                                    tick={{ fill: "#888", fontSize: 11, fontFamily: "monospace" }}
-                                    tickFormatter={(v) => `${Math.round(v)} €`}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: "#0d0d0d",
-                                        border: "1px solid #333",
-                                        fontFamily: "monospace",
-                                        fontSize: 12,
-                                    }}
-                                    labelStyle={{ color: "#eab308" }}
-                                    labelFormatter={(lbl) => `Jour ${lbl}`}
-                                    formatter={(value) => [`${fmt(value)} €`, "Solde projeté"]}
-                                />
-                                <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "0 €", fill: "#ef4444", fontSize: 10, position: "insideRight" }} />
-                                <Line
-                                    type="monotone"
-                                    dataKey="solde"
-                                    stroke="#22d3ee"
-                                    strokeWidth={2}
-                                    dot={{ fill: "#22d3ee", r: 3 }}
-                                    activeDot={{ r: 5 }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                )}
-            </SectionCard>
 
             {/* Charges mensuelles + Abonnements clients récurrents */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
