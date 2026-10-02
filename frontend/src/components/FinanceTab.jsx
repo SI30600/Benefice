@@ -448,7 +448,8 @@ export default function FinanceTab() {
         }
     }, [urssafPrompt.show, urssafPrompt.suggestedAmount, urssafPromptAmount]);
 
-    // URSSAF: prélèvement le 4 de chaque mois, sur CA de M-2 (décalage 2 mois)
+    // URSSAF: prélèvement effectif début de mois (compte débité ≈ le 1er) ;
+    // à partir du 2 de chaque mois on considère le prélèvement du mois courant comme déjà passé.
     const upcomingUrssaf = useMemo(() => {
         const today = new Date();
         const handled = balance.urssaf_handled_cycles || [];
@@ -461,6 +462,12 @@ export default function FinanceTab() {
             // Ne garde que les prélèvements à venir : passé le 4, le cycle est considéré payé,
             // la ligne suivante (cycle M+1) prend automatiquement la place de "Dernier URSSAF"
             if (diff < 0 || diff > PREV_HORIZON) continue;
+
+            // Nouveau : à partir du 2 du mois de prélèvement, on considère que l'URSSAF a déjà été débitée
+            const isSameMonth =
+                payDate.getFullYear() === today.getFullYear() &&
+                payDate.getMonth() === today.getMonth();
+            if (isSameMonth && today.getDate() >= 2) continue;
 
             const cycle = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
             if (handled.find((h) => h.cycle === cycle)) continue;
@@ -612,9 +619,10 @@ export default function FinanceTab() {
         const handled = balance.urssaf_handled_cycles || [];
         const overrideVal = parseFloat(urssafNextOverride) || 0;
 
-        // 4 du mois courant = URSSAF de M-2 (prev_prev) — uniquement si le 4 n'est pas encore passé
+        // 4 du mois courant = URSSAF de M-2 (prev_prev) — uniquement si on est AVANT le 2 du mois
+        // (à partir du 2, le prélèvement a été effectué par l'URSSAF ; déjà reflété dans le solde réel)
         const curCycle = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        if (!handled.find((h) => h.cycle === curCycle)) {
+        if (now.getDate() < 2 && !handled.find((h) => h.cycle === curCycle)) {
             const auto = summary?.prev_prev?.total_taxes || 0;
             const amt = auto > 0 ? auto : (overrideVal > 0 ? overrideVal : 0);
             if (amt > 0) {
