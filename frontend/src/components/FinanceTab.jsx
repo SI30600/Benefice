@@ -800,9 +800,7 @@ export default function FinanceTab() {
                         )}
                     </SectionCard>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" id="entry-form-anchor">
-                        {/* ===== LEFT COLUMN : Récap + Saisie ===== */}
-                        <div className="flex flex-col gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                         {/* Récapitulatif compact */}
                         <SectionCard>
                             <SectionTitle icon={Receipt}>Récapitulatif</SectionTitle>
