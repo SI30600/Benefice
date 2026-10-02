@@ -48,7 +48,7 @@ const blankComponents = (list) =>
     Object.fromEntries(list.map((c) => [c.key, { name: "", cost: "", sale: "" }]));
 
 export default function Calculator() {
-    const [mode, setMode] = useState("quick");
+    const [mode, setMode] = useState("finance");
 
     // Quick calculator (articles multi-achats → 13%)
     const blankItem = () => ({
