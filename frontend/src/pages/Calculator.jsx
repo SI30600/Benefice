@@ -239,6 +239,18 @@ export default function Calculator() {
 
                         <div className="inline-flex border border-[#262626] bg-[#0d0d0d] p-1 w-fit flex-wrap">
                             <button
+                                data-testid="tab-finance"
+                                onClick={() => setMode("finance")}
+                                className={`flex items-center gap-2 px-5 py-3 text-xs tracking-[0.2em] uppercase font-mono transition-all ${
+                                    mode === "finance"
+                                        ? "bg-yellow-500 text-black"
+                                        : "text-gray-500 hover:text-white"
+                                }`}
+                            >
+                                <Wallet className="h-3.5 w-3.5" />
+                                Suivi Finance
+                            </button>
+                            <button
                                 data-testid="tab-quick"
                                 onClick={() => setMode("quick")}
                                 className={`flex items-center gap-2 px-5 py-3 text-xs tracking-[0.2em] uppercase font-mono transition-all ${
@@ -261,18 +273,6 @@ export default function Calculator() {
                             >
                                 <Wrench className="h-3.5 w-3.5" />
                                 Assemblage PC
-                            </button>
-                            <button
-                                data-testid="tab-finance"
-                                onClick={() => setMode("finance")}
-                                className={`flex items-center gap-2 px-5 py-3 text-xs tracking-[0.2em] uppercase font-mono transition-all ${
-                                    mode === "finance"
-                                        ? "bg-yellow-500 text-black"
-                                        : "text-gray-500 hover:text-white"
-                                }`}
-                            >
-                                <Wallet className="h-3.5 w-3.5" />
-                                Suivi Finance
                             </button>
                         </div>
                     </div>
