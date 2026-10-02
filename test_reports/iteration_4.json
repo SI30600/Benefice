@@ -1,0 +1,29 @@
+{
+  "summary": "Validated all 3 fixes on Suivi Finance tab (iteration 4). (1) BUG FIX future entries in 90d projection: seeded J+5 prestation 500€ + J+10 achat 200€ via API, projection chart renders a +500 bump at J+5 and a −200 dip at J+10 (visible on screenshot: line goes from ~1950 → ~2500 → ~2300). The new line `[data-testid=upcoming-entries-line]` shows '+ Saisies futures +300,00 €' (net 500−200). Backend GET /api/finance/entries?date_from=X&date_to=Y filters correctly, is inclusive on both bounds, returns 401 without auth, and the legacy ?month=YYYY-MM param still works. 5/5 pytest cases pass. (2) LAYOUT FIX: grid parent of Récapitulatif + État du compte is now 'grid grid-cols-1 lg:grid-cols-2 gap-6 items-start' — no more 1/3-2/3 split, no vertical stretch. (3) ORDER FIX: projection-chart y=910 < net-pocket-current y=1335 → projection is now ABOVE Récapitulatif. No regression on previously removed blocks (Détail URSSAF, Stock, Paiements à préparer, Achats en attente, Déclarer URSSAF), Coût matériel field + Historique 12 mois chart still render. Seeds cleaned.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Suivi Finance — projection chart", "issues": ["Recharts prints 'width(-1) height(-1)' warning for 2-4 frames at first paint (ResponsiveContainer measures after mount). Harmless, same console-warning noise reported in iteration_3. Could be silenced by giving ResponsiveContainer minWidth/minHeight."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_finance_entries_range.py",
+    "/app/test_reports/pytest/pytest_finance_range.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FinanceTab.jsx is now >1960 lines — same recommendation as prev iterations: extract ProjectionChart + PocketHistoryChart + UrssafPrompt into sub-components.",
+    "projectionData useMemo recomputes O(90 × charges × revenues) each render; fine today but caches would help once more recurring items are added.",
+    "Minor: `upcomingEntries` is defaulted to [] via `(upR.data || [])` but refresh() doesn't handle an upR failure independently — if the date_from/date_to call 500s, the whole Promise.all rejects and silently sets loading=false with no user feedback (just console.error)."
+  ],
+  "updated_files": ["/app/backend/tests/test_finance_entries_range.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "MongoDB portal_sessions token 'TEST_TOKEN_DO_NOT_USE_IN_PROD' (email contact@solutioninformatique.fr) — upserted, valid 24h.",
+  "seed_data_creation": "Temporarily inserted 2 finance_entries with client_name='SEED_FUTURE_V3' (J+5 presta 500€, J+10 achat 200€) during browser test to validate the projection chart + upcoming-entries-line. Both deleted at end. DB is clean.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression for the entries date range filter lives at /app/backend/tests/test_finance_entries_range.py (5 tests, 100% pass). Key frontend selectors: [data-testid=projection-chart] must appear ABOVE [data-testid=net-pocket-current] in the DOM/viewport; the net-future-entries line is [data-testid=upcoming-entries-line] (text starts with '+ Saisies futures' or '− Saisies futures (achats)'); the parent grid of Récap+État must contain classes 'lg:grid-cols-2' and 'items-start'. Backend API supports GET /api/finance/entries with either ?month=YYYY-MM OR ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD (bounds inclusive).",
+  "rca of the issue": "N/A — all 3 fixes are implemented correctly. Projection chart now adds upcomingEntries into eventsByDate at exact dates (FinanceTab.jsx L577-587), so a saisie manuelle datée dans le futur impacte immédiatement la courbe. The new backend endpoint parameter is a simple MongoDB date range query ($gte/$lte on the YYYY-MM-DD string field, which sorts lexicographically correctly)."
+}
