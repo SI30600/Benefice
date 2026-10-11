@@ -518,20 +518,24 @@ export default function FinanceTab() {
         [upcomingUrssaf]
     );
 
-    // Saisies futures dans les 35 prochains jours (CA − achats) — net impact sur le cash
-    const upcomingEntriesNet35 = useMemo(() => {
-        if (!upcomingEntries || upcomingEntries.length === 0) return 0;
+    // Saisies futures dans les 35 prochains jours — ventilées CA brut vs achats
+    const upcomingSplits35 = useMemo(() => {
         const now = new Date();
         const todayKey = now.toISOString().slice(0, 10);
         const horizon = new Date(now);
         horizon.setDate(horizon.getDate() + 35);
         const horizonKey = horizon.toISOString().slice(0, 10);
-        return upcomingEntries.reduce((s, e) => {
-            if (!e.date || e.date <= todayKey || e.date > horizonKey) return s;
+        let revenue = 0;
+        let achat = 0;
+        (upcomingEntries || []).forEach((e) => {
+            if (!e.date || e.date <= todayKey || e.date > horizonKey) return;
             const amt = Number(e.amount) || 0;
-            return s + (e.category === "achat" ? -amt : amt);
-        }, 0);
+            if (e.category === "achat") achat += amt;
+            else revenue += amt;
+        });
+        return { revenue: +revenue.toFixed(2), achat: +achat.toFixed(2), net: +(revenue - achat).toFixed(2) };
     }, [upcomingEntries]);
+    const upcomingEntriesNet35 = upcomingSplits35.net;
 
     const projected = useMemo(() => {
         if (!cur) return 0;
@@ -987,12 +991,16 @@ export default function FinanceTab() {
                                 <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 35 prochains jours</div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
-                                {upcomingEntriesNet35 !== 0 && (
-                                    <div className="flex justify-between" data-testid="upcoming-entries-line">
-                                        <span className="text-gray-400">{upcomingEntriesNet35 >= 0 ? "+ Saisies futures" : "− Saisies futures (achats)"}</span>
-                                        <span className={upcomingEntriesNet35 >= 0 ? "text-green-400" : "text-red-400"}>
-                                            {upcomingEntriesNet35 >= 0 ? "+" : "−"}{fmt(Math.abs(upcomingEntriesNet35))} €
-                                        </span>
+                                {upcomingSplits35.revenue > 0 && (
+                                    <div className="flex justify-between" data-testid="upcoming-revenue-line">
+                                        <span className="text-gray-400">+ Saisies futures (CA)</span>
+                                        <span className="text-green-400">+{fmt(upcomingSplits35.revenue)} €</span>
+                                    </div>
+                                )}
+                                {upcomingSplits35.achat > 0 && (
+                                    <div className="flex justify-between" data-testid="upcoming-achat-line">
+                                        <span className="text-gray-400">− Coûts matériel futurs</span>
+                                        <span className="text-red-400">−{fmt(upcomingSplits35.achat)} €</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between"><span className="text-gray-400">− Prélèvements à venir</span><span className="text-red-400">−{fmt(chargesUpcomingTotal)} €</span></div>
