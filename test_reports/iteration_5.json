@@ -1,0 +1,26 @@
+{
+  "summary": "Validated the Suivi Finance 'Saisies futures' split fix (iteration 5). The old single line '+ Saisies futures +X,XX €' (combined CA+achats) is REMOVED. It is now split into TWO lines in the État du compte block, both bounded to the 35-day horizon: (1) [data-testid=upcoming-revenue-line] '+ Saisies futures (CA)' with CA brut uniquement, (2) [data-testid=upcoming-achat-line] '− Coûts matériel futurs' pour les achats. Entries dated beyond J+35 (e.g., J+40) are correctly EXCLUDED from both lines (upcomingSplits35 memo filters `e.date > horizonKey`). They remain visible on the 90-day projection chart (upcomingEntries memo in projectionData has horizon=90 days). E2E test: seeded J+5 presta 1000€, J+20 presta 500,51€, J+5 achat 200€, J+40 presta 3000€, J+40 achat 500€. Observed upcoming-revenue-line = +1 500,51 € (expected: 1000 + 500,51 = 1500,51, J+40 excluded ✓), upcoming-achat-line = −200,00 € (J+40 excluded ✓). Projection chart shows all 3 bumps including J+40. Legacy [data-testid=upcoming-entries-line] no longer exists in DOM. All 5 SEED_SPLIT_ entries cleaned via DELETE /api/finance/entries/{id} at end of test. DB clean.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_finance_entries_range.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FinanceTab.jsx still ~1931 lines — recurring recommendation to extract ProjectionChart, PocketHistoryChart, EtatCompte into sub-components.",
+    "upcomingSplits35 uses `e.date > todayKey && e.date <= horizonKey` (inclusive horizon) — consistent with the '35 prochains jours' label. OK.",
+    "projection chart loop uses `e.date <= todayKey` to exclude today's entries from future shift — intentional (today is startToday)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Re-upserted portal_sessions token 'TEST_TOKEN_DO_NOT_USE_IN_PROD' (email contact@solutioninformatique.fr), expires in 24h.",
+  "seed_data_creation": "Inserted 5 finance_entries with client_name='SEED_SPLIT_*' (J+5 revenue+achat, J+20 revenue, J+40 revenue+achat). All deleted at end of test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Key selectors for the État du compte '35 prochains jours' split: [data-testid=upcoming-revenue-line] (CA uniquement, texte '+ Saisies futures (CA)') and [data-testid=upcoming-achat-line] (texte '− Coûts matériel futurs'). The legacy combined [data-testid=upcoming-entries-line] has been removed. The 35d filter lives in `upcomingSplits35` useMemo in FinanceTab.jsx L521-537. The 90d projection chart (projectionData useMemo L557+) still includes entries up to J+90 at their exact date. Always clean SEED_SPLIT_ entries after test. Auth: upsert portal_sessions token before test (session expires 24h).",
+  "rca of the issue": "N/A — fix is correct. The user's reported line '+ Saisies futures +4 460,51 €' (single combined line including J+40 entries) no longer exists. It has been split into (CA) and (coûts matériel futurs), both filtered to the 35-day horizon, matching the surrounding 'Sur 35 prochains jours' section."
+}
