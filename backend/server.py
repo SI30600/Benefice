@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from finance import (
     FinanceEntry, FinanceEntryCreate, PendingPayment, PendingPaymentCreate,
@@ -219,7 +220,7 @@ async def update_finance_entry(entry_id: str, body: EntryUpdate, _=Depends(requi
         update["category"] = body.category
     if body.reconciled is not None:
         update["reconciled"] = body.reconciled
-        update["reconciled_at"] = datetime.now(timezone.utc).isoformat() if body.reconciled else None
+        update["reconciled_at"] = datetime.now(ZoneInfo("Europe/Paris")).isoformat() if body.reconciled else None
     if not update:
         raise HTTPException(status_code=400, detail="Aucun champ à modifier")
     res = await db.finance_entries.update_one({"id": entry_id}, {"$set": update})
@@ -237,6 +238,27 @@ async def reset_finance_month(month: str, _=Depends(require_auth)):
     return {"deleted": res.deleted_count, "month": month}
 
 
+async def counted_rows(month: str) -> list:
+    """Entrées comptées dans un mois : achats/anciens par date, entrées d'argent par mois de pointage."""
+    return await db.finance_entries.find(
+        {"$or": [
+            {"date": {"$regex": f"^{month}-"}, "$or": [{"category": "achat"}, {"date": {"$lt": RECONCILE_FROM}}]},
+            {"category": {"$ne": "achat"}, "date": {"$gte": RECONCILE_FROM}, "reconciled": True,
+             "reconciled_at": {"$regex": f"^{month}-"}},
+        ]},
+        {"_id": 0},
+    ).to_list(2000)
+
+
+@api_router.get("/finance/entries/awaiting")
+async def list_awaiting_entries(before: str, _=Depends(require_auth)):
+    """Entrées d'argent non pointées datées avant `before` (YYYY-MM-DD) — reportées sur le mois en cours."""
+    return await db.finance_entries.find(
+        {"category": {"$ne": "achat"}, "date": {"$gte": RECONCILE_FROM, "$lt": before}, "reconciled": {"$ne": True}},
+        {"_id": 0},
+    ).sort("date", 1).to_list(2000)
+
+
 @api_router.get("/finance/summary")
 async def get_finance_summary(month: Optional[str] = None, _=Depends(require_auth)):
     """Summary of a month (default current). Returns current + previous month."""
@@ -250,15 +272,9 @@ async def get_finance_summary(month: Optional[str] = None, _=Depends(require_aut
     pp_y, pp_m = (prev_y - 1, 12) if prev_m == 1 else (prev_y, prev_m - 1)
     prev_prev_month = f"{pp_y:04d}-{pp_m:02d}"
 
-    cur_rows = await db.finance_entries.find(
-        {"date": {"$regex": f"^{month}-"}}, {"_id": 0}
-    ).to_list(2000)
-    prev_rows = await db.finance_entries.find(
-        {"date": {"$regex": f"^{prev_month}-"}}, {"_id": 0}
-    ).to_list(2000)
-    prev_prev_rows = await db.finance_entries.find(
-        {"date": {"$regex": f"^{prev_prev_month}-"}}, {"_id": 0}
-    ).to_list(2000)
+    cur_rows = await counted_rows(month)
+    prev_rows = await counted_rows(prev_month)
+    prev_prev_rows = await counted_rows(prev_prev_month)
 
     awaiting = await db.finance_entries.find(
         {
@@ -291,9 +307,7 @@ async def get_pocket_history(months: int = 12, _=Depends(require_auth)):
     history = []
     for _i in range(months):
         month_key = f"{y:04d}-{m:02d}"
-        rows = await db.finance_entries.find(
-            {"date": {"$regex": f"^{month_key}-"}}, {"_id": 0}
-        ).to_list(2000)
+        rows = await counted_rows(month_key)
         s = compute_summary(rows)
         history.append({
             "month": month_key,

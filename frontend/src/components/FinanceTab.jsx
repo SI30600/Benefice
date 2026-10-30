@@ -104,6 +104,33 @@ const ReconcileCounter = ({ entries }) => {
 };
 
 
+const AwaitingBlock = ({ entries, onToggle }) => {
+    if (entries.length === 0) return null;
+    const total = entries.reduce((s, e) => s + (e.amount || 0), 0);
+    return (
+        <div data-testid="awaiting-block" className="mb-4 border border-orange-500/40 bg-orange-950/10 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span className="text-[10px] tracking-[0.2em] uppercase font-mono text-orange-400">
+                    Encore en attente des mois précédents · {entries.length}
+                </span>
+                <span data-testid="awaiting-block-total" className="text-[11px] font-mono font-bold text-orange-400">{fmt(total)} €</span>
+            </div>
+            <div className="space-y-1">
+                {entries.map((e) => (
+                    <div key={e.id} data-testid={`awaiting-item-${e.id}`} className="flex items-center gap-3 px-3 py-2 bg-[#0d0d0d] border border-[#222222]">
+                        <span className="text-[11px] font-mono text-gray-400 shrink-0">{e.date}</span>
+                        <span className="hidden sm:inline shrink-0"><CategoryPill value={e.category} /></span>
+                        <span className="flex-1 min-w-0 text-sm text-white truncate">{e.client_name || e.description || "—"}</span>
+                        <span className="font-mono text-sm font-bold text-yellow-500 shrink-0">{fmt(e.amount)} €</span>
+                        <ReconcileButton entry={e} onToggle={() => onToggle(e)} />
+                    </div>
+                ))}
+            </div>
+            <p className="text-[9px] text-gray-500 font-mono mt-2">Cocher ici = compté dans le mois en cours (mois de l&apos;encaissement)</p>
+        </div>
+    );
+};
+
 export default function FinanceTab() {
     const today = new Date().toISOString().slice(0, 10);
     const [month, setMonth] = useState(today.slice(0, 7));
@@ -115,6 +142,7 @@ export default function FinanceTab() {
     const [wife, setWife] = useState({ items: [], paid: 0, target: 300, remaining: 300 });
     const [pocketHistory, setPocketHistory] = useState([]);
     const [upcomingEntries, setUpcomingEntries] = useState([]);
+    const [awaitingEntries, setAwaitingEntries] = useState([]);
     // Override URSSAF désactivé : on utilise toujours l'auto-calcul depuis le CA réel
     // Variables maintenues pour compatibilité avec le reste du code (always 0)
     const urssafNextOverride = "";
@@ -153,7 +181,8 @@ export default function FinanceTab() {
                 d.setDate(d.getDate() + 95);
                 return d.toISOString().slice(0, 10);
             })();
-            const [sumR, entR, penR, balR, chargesR, revR, wifeR, histR, upR] = await Promise.all([
+            const isCurrentMonth = month === todayIso.slice(0, 7);
+            const [sumR, entR, penR, balR, chargesR, revR, wifeR, histR, upR, awR] = await Promise.all([
                 axios.get(`${API}/finance/summary?month=${month}`),
                 axios.get(`${API}/finance/entries?month=${month}`),
                 axios.get(`${API}/finance/pending`),
@@ -163,7 +192,11 @@ export default function FinanceTab() {
                 axios.get(`${API}/finance/wife-payments?month=${month}`),
                 axios.get(`${API}/finance/pocket-history?months=12`),
                 axios.get(`${API}/finance/entries?date_from=${todayIso}&date_to=${futureIso}`),
+                isCurrentMonth
+                    ? axios.get(`${API}/finance/entries/awaiting?before=${month}-01`)
+                    : Promise.resolve({ data: [] }),
             ]);
+            setAwaitingEntries(awR.data || []);
             setSummary(sumR.data);
             setEntries(entR.data);
             setPending(penR.data);
@@ -1872,6 +1905,7 @@ export default function FinanceTab() {
                         </button>
                     </div>
                 </div>
+                <AwaitingBlock entries={awaitingEntries} onToggle={toggleReconciled} />
                 {entries.length === 0 ? (
                     <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed flex items-center justify-center gap-2">
                         <AlertCircle className="h-3.5 w-3.5" />
@@ -1902,6 +1936,7 @@ export default function FinanceTab() {
                                         {e.category !== "achat" && e.reconciled && e.reconciled_at && (
                                             <div data-testid={`entry-reconciled-date-${e.id}`} className="text-[9px] text-green-400 font-mono uppercase tracking-wider">
                                                 ✓ Pointé le {new Date(e.reconciled_at).toLocaleDateString("fr-FR")}
+                                                {e.reconciled_at.slice(0, 7) !== e.date.slice(0, 7) && ` · compté en ${monthLabel(e.reconciled_at.slice(0, 7))}`}
                                             </div>
                                         )}
                                         {e.category !== "achat" && !e.reconciled && summary?.reconcile_from && e.date >= summary.reconcile_from && (
