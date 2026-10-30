@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from finance import (
     FinanceEntry, FinanceEntryCreate, PendingPayment, PendingPaymentCreate,
-    AccountBalance, compute_summary, CATEGORIES,
+    AccountBalance, compute_summary, CATEGORIES, RECONCILE_FROM,
     LbcPurchase, LbcPurchaseCreate,
     MonthlyCharge, MonthlyChargeCreate,
     RecurringRevenue, RecurringRevenueCreate,
@@ -260,10 +260,22 @@ async def get_finance_summary(month: Optional[str] = None, _=Depends(require_aut
         {"date": {"$regex": f"^{prev_prev_month}-"}}, {"_id": 0}
     ).to_list(2000)
 
+    awaiting = await db.finance_entries.find(
+        {
+            "category": {"$ne": "achat"},
+            "date": {"$gte": RECONCILE_FROM, "$lte": today.isoformat()},
+            "reconciled": {"$ne": True},
+        },
+        {"_id": 0, "amount": 1},
+    ).to_list(2000)
+
     return {
         "month": month,
         "previous_month": prev_month,
         "prev_prev_month": prev_prev_month,
+        "reconcile_from": RECONCILE_FROM,
+        "awaiting_reconcile_total": round(sum(a["amount"] for a in awaiting), 2),
+        "awaiting_reconcile_count": len(awaiting),
         "current": compute_summary(cur_rows),
         "previous": compute_summary(prev_rows),
         "prev_prev": compute_summary(prev_prev_rows),

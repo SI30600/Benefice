@@ -22,6 +22,13 @@ RATE_FORMATION = 0.002
 CATEGORIES = ("prestation", "materiel", "formation", "achat", "autre")
 Category = Literal["prestation", "materiel", "formation", "achat", "autre"]
 
+# À partir de ce mois, une entrée d'argent ne compte que si elle est pointée (relevé bancaire)
+RECONCILE_FROM = "2026-10-01"
+
+
+def is_counted(e: dict) -> bool:
+    return e["category"] == "achat" or e["date"] < RECONCILE_FROM or bool(e.get("reconciled"))
+
 
 class FinanceEntry(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -180,6 +187,7 @@ class AccountBalance(BaseModel):
 
 
 def compute_summary(entries: list[dict]) -> dict:
+    entries = [e for e in entries if is_counted(e)]
     presta = round(sum(e["amount"] for e in entries if e["category"] == "prestation"), 2)
     materiel = round(sum(e["amount"] for e in entries if e["category"] == "materiel"), 2)
     formation = round(sum(e["amount"] for e in entries if e["category"] == "formation"), 2)

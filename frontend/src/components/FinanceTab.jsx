@@ -404,6 +404,8 @@ export default function FinanceTab() {
     };
 
     const cur = summary?.current;
+    const awaitingTotal = summary?.awaiting_reconcile_total || 0;
+    const expectedTotal = pending.total + awaitingTotal;
     const prev = summary?.previous;
 
     // Charges/revenus récurrents dans les 35 prochains jours (horizon "disponible prév.")
@@ -582,7 +584,7 @@ export default function FinanceTab() {
         const cb = parseFloat(cbDeferredInput) || 0;
         return (
             real
-            + pending.total
+            + expectedTotal
             + revenuesUpcomingTotal
             + upcomingEntriesNet35
             - totalUpcomingUrssaf
@@ -590,7 +592,7 @@ export default function FinanceTab() {
             - cb
             - chargesUpcomingTotal
         );
-    }, [balanceInput, cbDeferredInput, pending.total, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf, upcomingEntriesNet35]);
+    }, [balanceInput, cbDeferredInput, expectedTotal, cur, chargesUpcomingTotal, revenuesUpcomingTotal, totalUpcomingUrssaf, extraCurrentMonthUrssaf, upcomingEntriesNet35]);
 
     // Courbe prévisionnelle : 90 jours glissants (aujourd'hui → J+90)
     const projectionData = useMemo(() => {
@@ -615,11 +617,11 @@ export default function FinanceTab() {
         }
 
         // Paiements attendus : crédités en bloc à J+PENDING_DELAY_DAYS (prudent)
-        if (pending.total > 0) {
+        if (expectedTotal > 0) {
             const d = new Date(now);
             d.setDate(curDay + PENDING_DELAY_DAYS);
             const key = d.toISOString().slice(0, 10);
-            if (key in eventsByDate) eventsByDate[key] += pending.total;
+            if (key in eventsByDate) eventsByDate[key] += expectedTotal;
         }
 
         // Saisies futures (date > aujourd'hui) : CA ajouté, achats soustraits à la date exacte
@@ -711,7 +713,7 @@ export default function FinanceTab() {
             });
         });
         return points;
-    }, [balanceInput, cbDeferredInput, pending.total, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles, upcomingEntries]);
+    }, [balanceInput, cbDeferredInput, expectedTotal, charges.items, revenues.items, cur, summary, urssafNextOverride, balance.urssaf_handled_cycles, upcomingEntries]);
 
     const projectionMin = useMemo(
         () => (projectionData.length ? Math.min(...projectionData.map((p) => p.solde)) : 0),
@@ -1149,7 +1151,7 @@ export default function FinanceTab() {
                                     </span>
                                 </div>
                                 <div className="text-[9px] tracking-[0.2em] uppercase font-mono text-gray-500 pt-1">Sur 35 prochains jours</div>
-                                <div className="flex justify-between"><span className="text-gray-400">+ Paiements attendus</span><span className="text-green-400">+{fmt(pending.total)} €</span></div>
+                                <div className="flex justify-between" data-testid="expected-payments-line"><span className="text-gray-400">+ Paiements attendus{awaitingTotal > 0 && <span className="text-gray-600 text-[10px] ml-1">(dont {fmt(awaitingTotal)} € non pointés)</span>}</span><span className="text-green-400">+{fmt(expectedTotal)} €</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">+ Abos clients à venir</span><span className="text-green-400">+{fmt(revenuesUpcomingTotal)} €</span></div>
                                 {upcomingSplits35.revenue > 0 && (
                                     <div className="flex justify-between" data-testid="upcoming-revenue-line">
@@ -1900,6 +1902,11 @@ export default function FinanceTab() {
                                         {e.category !== "achat" && e.reconciled && e.reconciled_at && (
                                             <div data-testid={`entry-reconciled-date-${e.id}`} className="text-[9px] text-green-400 font-mono uppercase tracking-wider">
                                                 ✓ Pointé le {new Date(e.reconciled_at).toLocaleDateString("fr-FR")}
+                                            </div>
+                                        )}
+                                        {e.category !== "achat" && !e.reconciled && summary?.reconcile_from && e.date >= summary.reconcile_from && (
+                                            <div data-testid={`entry-awaiting-${e.id}`} className="text-[9px] text-gray-500 font-mono uppercase tracking-wider">
+                                                En attente · pas encore compté
                                             </div>
                                         )}
                                     </div>
