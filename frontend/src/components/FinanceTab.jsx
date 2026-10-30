@@ -1627,8 +1627,8 @@ export default function FinanceTab() {
                                 );
                             })}
                             <div className="flex justify-between pt-2 text-[11px] font-mono">
-                                <span className="text-gray-400 uppercase tracking-wider text-[10px]">À venir ce mois</span>
-                                <span className="text-red-400 font-bold">−{fmt(chargesUpcomingTotal)} €</span>
+                                <span className="text-gray-400 uppercase tracking-wider text-[10px]">À payer · 35 prochains jours</span>
+                                <span data-testid="charges-upcoming-total" className="text-red-400 font-bold">−{fmt(chargesUpcomingTotal)} €</span>
                             </div>
                         </div>
                     )}
@@ -1731,8 +1731,8 @@ export default function FinanceTab() {
                                 );
                             })}
                             <div className="flex justify-between pt-2 text-[11px] font-mono">
-                                <span className="text-gray-400 uppercase tracking-wider text-[10px]">À venir ce mois</span>
-                                <span className="text-green-400 font-bold">+{fmt(revenuesUpcomingTotal)} €</span>
+                                <span className="text-gray-400 uppercase tracking-wider text-[10px]">À encaisser · 35 prochains jours</span>
+                                <span data-testid="revenues-upcoming-total" className="text-green-400 font-bold">+{fmt(revenuesUpcomingTotal)} €</span>
                             </div>
                         </div>
                     )}
