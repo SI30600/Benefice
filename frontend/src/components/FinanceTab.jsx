@@ -276,7 +276,12 @@ export default function FinanceTab() {
     };
     const cancelEditEntry = () => setEditingEntry(null);
     const toggleReconciled = async (e) => {
-        await axios.patch(`${API}/finance/entries/${e.id}`, { reconciled: !e.reconciled });
+        try {
+            const res = await axios.patch(`${API}/finance/entries/${e.id}`, { reconciled: !e.reconciled });
+            if (res.data?.reconciled === undefined) throw new Error("serveur pas à jour");
+        } catch (err) {
+            alert(`Pointage impossible : ${err.response?.data?.detail || err.message}. Le serveur (Render) doit être mis à jour.`);
+        }
         refresh();
     };
 
