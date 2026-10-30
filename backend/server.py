@@ -383,6 +383,8 @@ async def confirm_pending_payment(payment_id: str, _=Depends(require_auth)):
         description=f"Encaissement {doc.get('client_name', '')}{(' — ' + doc['note']) if doc.get('note') else ''}".strip(),
         client_name=doc.get("client_name", ""),
         source="pending",
+        reconciled=True,
+        reconciled_at=datetime.now(ZoneInfo("Europe/Paris")).isoformat(),
     )
     await db.finance_entries.insert_one(entry.model_dump())
     await db.pending_payments.delete_one({"id": payment_id})
