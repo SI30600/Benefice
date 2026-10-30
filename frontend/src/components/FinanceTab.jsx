@@ -3,7 +3,7 @@ import axios from "axios";
 import {
     Wallet, Plus, Trash2, Calendar, ArrowDownToLine, ArrowUpFromLine,
     AlertCircle, Loader2, Check, RefreshCw, Coins, FileText, Receipt,
-    TrendingUp, RotateCcw, Package, Pencil, X,
+    TrendingUp, RotateCcw, Package, Pencil, X, CheckCircle2, Circle,
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell, LabelList } from "recharts";
 
@@ -73,6 +73,36 @@ const SectionTitle = ({ icon: Icon, children, accent }) => (
         </span>
     </div>
 );
+
+const ReconcileButton = ({ entry, onToggle }) => (
+    <button
+        data-testid={`entry-reconcile-${entry.id}`}
+        onClick={onToggle}
+        className={`transition-transform hover:scale-110 ${entry.reconciled ? "text-green-500" : "text-gray-600 hover:text-green-400"}`}
+        aria-label={entry.reconciled ? "Dé-pointer" : "Pointer avec le relevé bancaire"}
+        title={entry.reconciled ? "Pointé — cliquer pour dé-pointer" : "Pointer avec le relevé bancaire"}
+    >
+        {entry.reconciled ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+    </button>
+);
+
+const ReconcileCounter = ({ entries }) => {
+    const incomes = entries.filter((e) => e.category !== "achat");
+    if (incomes.length === 0) return null;
+    const done = incomes.filter((e) => e.reconciled);
+    const received = done.reduce((s, e) => s + (e.amount || 0), 0);
+    const all = done.length === incomes.length;
+    return (
+        <span
+            data-testid="reconcile-counter"
+            className={`ml-2 inline-flex items-center gap-1 px-2 py-0.5 border text-[10px] font-mono ${all ? "border-green-500/50 text-green-400" : "border-[#333333] text-gray-400"}`}
+        >
+            <CheckCircle2 className="h-3 w-3" />
+            {done.length}/{incomes.length} pointées – {fmt(received)} € reçus
+        </span>
+    );
+};
+
 
 export default function FinanceTab() {
     const today = new Date().toISOString().slice(0, 10);
@@ -245,6 +275,10 @@ export default function FinanceTab() {
         refresh();
     };
     const cancelEditEntry = () => setEditingEntry(null);
+    const toggleReconciled = async (e) => {
+        await axios.patch(`${API}/finance/entries/${e.id}`, { reconciled: !e.reconciled });
+        refresh();
+    };
 
     const addPending = async () => {
         if (!pendingForm.client_name || !pendingForm.amount) return;
@@ -805,6 +839,7 @@ export default function FinanceTab() {
                     </SectionCard>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                        <div className="space-y-6">
                         {/* Récapitulatif compact */}
                         <SectionCard>
                             <SectionTitle icon={Receipt}>Récapitulatif</SectionTitle>
@@ -872,6 +907,126 @@ export default function FinanceTab() {
                                 )}
                             </div>
                         </SectionCard>
+                {/* Historique "Dans ta poche" — 12 derniers mois */}
+                <SectionCard>
+                    <SectionTitle icon={TrendingUp} accent="text-green-400">
+                        Historique dans ta poche · 12 derniers mois
+                    </SectionTitle>
+                    {(() => {
+                        const nonZero = pocketHistory.filter((h) => (h.pocket || 0) !== 0);
+                        if (nonZero.length === 0) {
+                            return (
+                                <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed">
+                                    Pas encore de données sur les 12 derniers mois
+                                </p>
+                            );
+                        }
+                        const total = pocketHistory.reduce((s, h) => s + (h.pocket || 0), 0);
+                        const positive = pocketHistory.filter((h) => (h.pocket || 0) > 0);
+                        const avg = positive.length > 0 ? total / positive.length : 0;
+                        const best = pocketHistory.reduce(
+                            (b, h) => ((h.pocket || 0) > (b.pocket || -Infinity) ? h : b),
+                            pocketHistory[0] || {}
+                        );
+                        const chartData = pocketHistory.map((h) => {
+                            const [yy, mm] = h.month.split("-");
+                            const shortLabel = monthLabel(h.month).split(" ")[0].slice(0, 3);
+                            return {
+                                ...h,
+                                label: `${shortLabel} ${yy.slice(2)}`,
+                                fullLabel: monthLabel(h.month),
+                                pocket: +(h.pocket || 0).toFixed(2),
+                                _mm: mm,
+                            };
+                        });
+                        const bestKey = best.month;
+                        return (
+                            <>
+                                <div className="grid grid-cols-3 gap-2 mb-4" data-testid="pocket-history-stats">
+                                    <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                        <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Total cumulé</div>
+                                        <div className={`font-mono text-lg font-bold ${total >= 0 ? "text-green-400" : "text-red-400"}`}>
+                                            {fmt(total)} €
+                                        </div>
+                                    </div>
+                                    <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                        <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Moyenne / mois actif</div>
+                                        <div className="font-mono text-lg font-bold text-green-300">{fmt(avg)} €</div>
+                                    </div>
+                                    <div className="border border-[#333333] bg-[#0d0d0d] p-2">
+                                        <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Meilleur mois</div>
+                                        <div className="font-mono text-sm font-bold text-green-400">
+                                            {fmt(best.pocket || 0)} €
+                                        </div>
+                                        <div className="text-[9px] text-gray-500 font-mono">
+                                            {best.month ? monthLabel(best.month) : "—"}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ width: "100%", height: 260 }} data-testid="pocket-history-chart">
+                                    <ResponsiveContainer>
+                                        <BarChart data={chartData} margin={{ top: 20, right: 12, left: 0, bottom: 8 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#222222" vertical={false} />
+                                            <XAxis
+                                                dataKey="label"
+                                                tick={{ fill: "#888", fontSize: 10, fontFamily: "monospace" }}
+                                                axisLine={{ stroke: "#333" }}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fill: "#666", fontSize: 10, fontFamily: "monospace" }}
+                                                axisLine={{ stroke: "#333" }}
+                                                tickLine={false}
+                                                tickFormatter={(v) => `${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v}`}
+                                                width={44}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    background: "#0d0d0d",
+                                                    border: "1px solid #333",
+                                                    fontFamily: "monospace",
+                                                    fontSize: 11,
+                                                }}
+                                                labelStyle={{ color: "#eab308", textTransform: "uppercase", letterSpacing: "0.15em" }}
+                                                formatter={(v, _n, p) => [
+                                                    `${fmt(v)} €`,
+                                                    p.payload.fullLabel,
+                                                ]}
+                                                cursor={{ fill: "#eab30822" }}
+                                            />
+                                            <ReferenceLine y={0} stroke="#444" />
+                                            <Bar dataKey="pocket" radius={[3, 3, 0, 0]}>
+                                                {chartData.map((entry) => (
+                                                    <Cell
+                                                        key={entry.month}
+                                                        fill={
+                                                            entry.month === bestKey && entry.pocket > 0
+                                                                ? "#22c55e"
+                                                                : entry.pocket >= 0
+                                                                    ? "#16a34a"
+                                                                    : "#dc2626"
+                                                        }
+                                                        fillOpacity={entry.month === bestKey && entry.pocket > 0 ? 1 : 0.75}
+                                                    />
+                                                ))}
+                                                <LabelList
+                                                    dataKey="pocket"
+                                                    position="top"
+                                                    formatter={(v) => (v ? fmt(v) : "")}
+                                                    style={{ fill: "#9ca3af", fontFamily: "monospace", fontSize: 9 }}
+                                                />
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <p className="text-[9px] text-gray-500 font-mono mt-2 leading-snug">
+                                    💡 &laquo;&nbsp;Dans ta poche&nbsp;&raquo; = CA − taxes − dépenses (achats). Barre plus foncée = meilleur mois.
+                                </p>
+                            </>
+                        );
+                    })()}
+                </SectionCard>
+                        </div>
 
                         {/* Account state */}
                         <SectionCard>
@@ -1578,125 +1733,6 @@ export default function FinanceTab() {
             </div>
 
 
-            {/* Historique "Dans ta poche" — 12 derniers mois */}
-            <SectionCard>
-                <SectionTitle icon={TrendingUp} accent="text-green-400">
-                    Historique dans ta poche · 12 derniers mois
-                </SectionTitle>
-                {(() => {
-                    const nonZero = pocketHistory.filter((h) => (h.pocket || 0) !== 0);
-                    if (nonZero.length === 0) {
-                        return (
-                            <p className="text-[11px] text-gray-500 font-mono py-8 text-center border border-[#333333] border-dashed">
-                                Pas encore de données sur les 12 derniers mois
-                            </p>
-                        );
-                    }
-                    const total = pocketHistory.reduce((s, h) => s + (h.pocket || 0), 0);
-                    const positive = pocketHistory.filter((h) => (h.pocket || 0) > 0);
-                    const avg = positive.length > 0 ? total / positive.length : 0;
-                    const best = pocketHistory.reduce(
-                        (b, h) => ((h.pocket || 0) > (b.pocket || -Infinity) ? h : b),
-                        pocketHistory[0] || {}
-                    );
-                    const chartData = pocketHistory.map((h) => {
-                        const [yy, mm] = h.month.split("-");
-                        const shortLabel = monthLabel(h.month).split(" ")[0].slice(0, 3);
-                        return {
-                            ...h,
-                            label: `${shortLabel} ${yy.slice(2)}`,
-                            fullLabel: monthLabel(h.month),
-                            pocket: +(h.pocket || 0).toFixed(2),
-                            _mm: mm,
-                        };
-                    });
-                    const bestKey = best.month;
-                    return (
-                        <>
-                            <div className="grid grid-cols-3 gap-2 mb-4" data-testid="pocket-history-stats">
-                                <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Total cumulé</div>
-                                    <div className={`font-mono text-lg font-bold ${total >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                        {fmt(total)} €
-                                    </div>
-                                </div>
-                                <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Moyenne / mois actif</div>
-                                    <div className="font-mono text-lg font-bold text-green-300">{fmt(avg)} €</div>
-                                </div>
-                                <div className="border border-[#333333] bg-[#0d0d0d] p-2">
-                                    <div className="text-[9px] tracking-[0.2em] uppercase text-gray-500 font-mono">Meilleur mois</div>
-                                    <div className="font-mono text-sm font-bold text-green-400">
-                                        {fmt(best.pocket || 0)} €
-                                    </div>
-                                    <div className="text-[9px] text-gray-500 font-mono">
-                                        {best.month ? monthLabel(best.month) : "—"}
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{ width: "100%", height: 260 }} data-testid="pocket-history-chart">
-                                <ResponsiveContainer>
-                                    <BarChart data={chartData} margin={{ top: 20, right: 12, left: 0, bottom: 8 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#222222" vertical={false} />
-                                        <XAxis
-                                            dataKey="label"
-                                            tick={{ fill: "#888", fontSize: 10, fontFamily: "monospace" }}
-                                            axisLine={{ stroke: "#333" }}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fill: "#666", fontSize: 10, fontFamily: "monospace" }}
-                                            axisLine={{ stroke: "#333" }}
-                                            tickLine={false}
-                                            tickFormatter={(v) => `${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v}`}
-                                            width={44}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                background: "#0d0d0d",
-                                                border: "1px solid #333",
-                                                fontFamily: "monospace",
-                                                fontSize: 11,
-                                            }}
-                                            labelStyle={{ color: "#eab308", textTransform: "uppercase", letterSpacing: "0.15em" }}
-                                            formatter={(v, _n, p) => [
-                                                `${fmt(v)} €`,
-                                                p.payload.fullLabel,
-                                            ]}
-                                            cursor={{ fill: "#eab30822" }}
-                                        />
-                                        <ReferenceLine y={0} stroke="#444" />
-                                        <Bar dataKey="pocket" radius={[3, 3, 0, 0]}>
-                                            {chartData.map((entry) => (
-                                                <Cell
-                                                    key={entry.month}
-                                                    fill={
-                                                        entry.month === bestKey && entry.pocket > 0
-                                                            ? "#22c55e"
-                                                            : entry.pocket >= 0
-                                                                ? "#16a34a"
-                                                                : "#dc2626"
-                                                    }
-                                                    fillOpacity={entry.month === bestKey && entry.pocket > 0 ? 1 : 0.75}
-                                                />
-                                            ))}
-                                            <LabelList
-                                                dataKey="pocket"
-                                                position="top"
-                                                formatter={(v) => (v ? fmt(v) : "")}
-                                                style={{ fill: "#9ca3af", fontFamily: "monospace", fontSize: 9 }}
-                                            />
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <p className="text-[9px] text-gray-500 font-mono mt-2 leading-snug">
-                                💡 &laquo;&nbsp;Dans ta poche&nbsp;&raquo; = CA − taxes − dépenses (achats). Barre plus foncée = meilleur mois.
-                            </p>
-                        </>
-                    );
-                })()}
-            </SectionCard>
 
 
             {/* Mémo — Versements femme */}
@@ -1783,12 +1819,13 @@ export default function FinanceTab() {
 
             {/* Entries list */}
             <SectionCard>
-                <div className="flex items-center justify-between gap-2 mb-4">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div className="flex flex-wrap items-center gap-2">
                         <FileText className="h-3.5 w-3.5 text-yellow-500" />
                         <span className="text-[10px] tracking-[0.3em] uppercase font-mono text-yellow-500">
                             Saisies du mois · {entries.length} ligne{entries.length > 1 ? "s" : ""}
                         </span>
+                        <ReconcileCounter entries={entries} />
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -1841,11 +1878,11 @@ export default function FinanceTab() {
                                 <div
                                     key={e.id}
                                     data-testid={`entry-item-${e.id}`}
-                                    className="grid grid-cols-12 gap-2 items-center px-3 py-2 bg-[#0d0d0d] border border-[#222222] hover:border-[#444444]"
+                                    className={`grid grid-cols-12 gap-2 items-center px-3 py-2 border transition-colors ${e.category !== "achat" && e.reconciled ? "bg-green-950/30 border-green-500/40" : "bg-[#0d0d0d] border-[#222222] hover:border-[#444444]"}`}
                                 >
-                                    <span className="col-span-2 text-[11px] font-mono text-gray-400">{e.date}</span>
-                                    <span className="col-span-2"><CategoryPill value={e.category} /></span>
-                                    <div className="col-span-4 min-w-0">
+                                    <span className="col-span-6 sm:col-span-2 text-[11px] font-mono text-gray-400">{e.date}</span>
+                                    <span className="col-span-6 sm:col-span-2 text-right sm:text-left"><CategoryPill value={e.category} /></span>
+                                    <div className="col-span-12 sm:col-span-3 min-w-0">
                                         <div className="text-sm text-white truncate">
                                             {e.client_name || e.description || "—"}
                                         </div>
@@ -1854,6 +1891,11 @@ export default function FinanceTab() {
                                         )}
                                         {e.source === "devis" && (
                                             <span className="text-[9px] text-yellow-500 font-mono uppercase tracking-wider">[auto]</span>
+                                        )}
+                                        {e.category !== "achat" && e.reconciled && e.reconciled_at && (
+                                            <div data-testid={`entry-reconciled-date-${e.id}`} className="text-[9px] text-green-400 font-mono uppercase tracking-wider">
+                                                ✓ Pointé le {new Date(e.reconciled_at).toLocaleDateString("fr-FR")}
+                                            </div>
                                         )}
                                     </div>
                                     {isEditing ? (
@@ -1868,14 +1910,17 @@ export default function FinanceTab() {
                                                 if (ev.key === "Escape") cancelEditEntry();
                                             }}
                                             autoFocus
-                                            className="col-span-3 h-8 px-2 bg-[#1a1a1a] border border-yellow-500 text-yellow-500 text-sm font-mono font-bold text-right focus:outline-none"
+                                            className="col-span-7 sm:col-span-3 h-8 px-2 bg-[#1a1a1a] border border-yellow-500 text-yellow-500 text-sm font-mono font-bold text-right focus:outline-none"
                                         />
                                     ) : (
-                                        <span className="col-span-3 font-mono text-sm font-bold text-yellow-500 text-right">
+                                        <span className="col-span-7 sm:col-span-3 font-mono text-sm font-bold text-yellow-500 sm:text-right">
                                             {fmt(e.amount)} €
                                         </span>
                                     )}
-                                    <div className="col-span-1 flex items-center justify-end gap-1.5">
+                                    <div className="col-span-5 sm:col-span-2 flex items-center justify-end gap-2">
+                                        {!isEditing && e.category !== "achat" && (
+                                            <ReconcileButton entry={e} onToggle={() => toggleReconciled(e)} />
+                                        )}
                                         {isEditing ? (
                                             <>
                                                 <button

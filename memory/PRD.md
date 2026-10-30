@@ -89,6 +89,9 @@ Application de calcul de bénéfice net pour revente de pièces informatiques + 
 - **2026-05-03** : Correction décalage URSSAF à 2 mois PARTOUT (ligne "Prochaine URSSAF", projection 30j, graphique 90j). Label dynamique "(4 mai · CA mars)" pour clarté. Le 90-day forecast place 3 prélèvements URSSAF : 4 du mois courant (si pas traité) = M-2 CA, 4 de M+1 = M-1 CA, 4 de M+2 = M CA
 - **2026-09-30** : UI simplification — suppression des blocs "Stock réel", "Paiements à préparer", et "Achats en attente" (LBC) du dashboard Finance. Nettoyage complet du state, des handlers, et des dépendances de projection.
 - **2026-09-30** : Nouveau champ **"Coût matériel"** dans le formulaire de saisie d'entrée — quand renseigné, crée automatiquement une entrée `achat` en parallèle de la vente. Aperçu temps réel de l'estim. "dans ta poche" (net = CA − taxes − coût) affiché avant validation. "DANS TA POCHE" reflète maintenant le bénéfice réel sans passer par le workflow LBC.
+- **2026-10-30** : **Pointage bancaire** des entrées d'argent (pas les dépenses `achat`) — bouton rond/coche par ligne dans "Saisies du mois", ligne verte + "✓ Pointé le JJ/MM/AAAA". Champs `reconciled` + `reconciled_at` sur `finance_entries`, via `PATCH /api/finance/entries/{id}` `{reconciled: bool}`. Compteur "X/Y pointées – Z € reçus" dans l'en-tête.
+- **2026-10-30** : Mise en page — l'historique "Dans ta poche 12 mois" est remonté sous le Récapitulatif (colonne gauche) pour supprimer le vide à côté de "État du compte". Lignes de saisies responsive sur mobile. Ligne "− URSSAF en cours" conservée (choix utilisateur).
+
 
 ### 🚧 Configuration Azure requise
 - App registration en single-tenant

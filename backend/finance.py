@@ -32,6 +32,8 @@ class FinanceEntry(BaseModel):
     description: str = ""
     client_name: str = ""
     source: str = "manual"  # "manual" | "devis"
+    reconciled: bool = False
+    reconciled_at: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 

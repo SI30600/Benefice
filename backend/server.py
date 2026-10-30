@@ -201,6 +201,7 @@ class EntryUpdate(BaseModel):
     amount: Optional[float] = None
     description: Optional[str] = None
     category: Optional[str] = None
+    reconciled: Optional[bool] = None
 
 
 @api_router.patch("/finance/entries/{entry_id}")
@@ -216,6 +217,9 @@ async def update_finance_entry(entry_id: str, body: EntryUpdate, _=Depends(requi
         if body.category not in CATEGORIES:
             raise HTTPException(status_code=400, detail="Catégorie invalide")
         update["category"] = body.category
+    if body.reconciled is not None:
+        update["reconciled"] = body.reconciled
+        update["reconciled_at"] = datetime.now(timezone.utc).isoformat() if body.reconciled else None
     if not update:
         raise HTTPException(status_code=400, detail="Aucun champ à modifier")
     res = await db.finance_entries.update_one({"id": entry_id}, {"$set": update})
